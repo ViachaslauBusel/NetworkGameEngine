@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Профиль 1": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\NetworkGameEngine.Generator.Debug\\NetworkGameEngine.Generator.Debug.csproj"
+    }
+  }
+}

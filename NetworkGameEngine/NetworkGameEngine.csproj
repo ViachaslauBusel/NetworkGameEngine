@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Zenject">
+      <HintPath>..\Libs\Zenject.dll</HintPath>
+    </Reference>
+    <Reference Include="Zenject-Signals">
+      <HintPath>..\Libs\Zenject-Signals.dll</HintPath>
+    </Reference>
+    <Reference Include="Zenject-usage">
+      <HintPath>..\Libs\Zenject-usage.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
