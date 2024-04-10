@@ -14,9 +14,10 @@ namespace Test
         public string Name { get; set; }
     }
     public class TestCommand : ICommand
-{
+    {
 
-}
+    }
+
     public class TestComponent : Component, IReactCommand<TestCommand>
     {
         public volatile int m_inject = 0;
@@ -34,7 +35,7 @@ namespace Test
             if (testService.Name.Equals("TruePass")) m_inject++;
             Console.WriteLine($"Hello from Inject:{Thread.CurrentThread.ManagedThreadId}, {testService.Name}");
         }
-        public override async Task Init()
+        public override void Init()
         {
             m_init++;
             Console.WriteLine($"Hello from Init:{Thread.CurrentThread.ManagedThreadId}");
@@ -64,7 +65,7 @@ namespace Test
             Console.WriteLine($"Hello from OnDestroy:{Thread.CurrentThread.ManagedThreadId}");
         }
 
-        public void ReactCommand(TestCommand command)
+        public void ReactCommand(ref TestCommand command)
         {
             m_cmd++;
             Console.WriteLine($"Hello from ReactTestCommand:{Thread.CurrentThread.ManagedThreadId}");

@@ -22,12 +22,12 @@ namespace NetworkGameEngine.Debugger
     public class TestComponent : Component, IReactCommand<TestCMD_0>, IReactCommand<TestCMD_1>, IReadData<TestData_0>
     {
 
-        public void ReactCommand(TestCMD_0 command)
+        public void ReactCommand(ref TestCMD_0 command)
         {
             Console.WriteLine(command.testValue);
         }
 
-        public void ReactCommand(TestCMD_1 command)
+        public void ReactCommand(ref TestCMD_1 command)
         {
             Console.WriteLine(command.testValue);
         }
@@ -76,12 +76,6 @@ namespace NetworkGameEngine.Debugger
           
             Thread.Sleep(800);
             Assert.IsTrue(data.OutValue == 1);
-
-            gameObject.SendCommand<TestCMD_0>()
-                .FillCoomand((ref t) =>
-                {
-                    t.testValue = "Hello World_0!!!";
-                });
         }
     }
 }

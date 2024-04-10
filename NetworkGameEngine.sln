@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkGameEngine.Generator
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkGameEngine.Generator.Debug", "NetworkGameEngine.Generator.Debug\NetworkGameEngine.Generator.Debug.csproj", "{7044E88B-0917-4A87-9BC2-62D6A2AE4E84}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkGameEngine.Debugger", "NetworkGameEngine.Debugger\NetworkGameEngine.Debugger.csproj", "{BC949313-AB0F-4500-88B2-1FB1E6634904}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkGameEngine.UnitTests", "NetworkGameEngine.Debugger\NetworkGameEngine.UnitTests.csproj", "{BC949313-AB0F-4500-88B2-1FB1E6634904}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

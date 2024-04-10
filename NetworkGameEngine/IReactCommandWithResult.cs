@@ -6,10 +6,8 @@ using System.Threading.Tasks;
 
 namespace NetworkGameEngine
 {
-    public class TestInternalComponent : Component, IReadData<TestData>
+    public interface IReactCommandWithResult<T, TResult> where T : ICommand
     {
-        public void UpdateData(ref TestData data)
-        {
-        }
+        TResult ReactCommand(ref T command);
     }
 }

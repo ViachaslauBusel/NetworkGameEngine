@@ -14,7 +14,7 @@ public class TestComponent : Component, IReactCommand<TestCommand>
     {
 
     }
-    public override async Task Init()
+    public override void Init()
     {
     }
 
@@ -37,10 +37,9 @@ public class TestComponent : Component, IReactCommand<TestCommand>
     
 
     //------------------------------------------------------
-    public override void CallReact(ICommand cmd)
+
+    public void ReactCommand(ref TestCommand command)
     {
     }
-
-
 }
 

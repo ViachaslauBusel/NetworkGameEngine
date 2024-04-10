@@ -1,33 +1,43 @@
-﻿using System.Diagnostics;
+﻿using NetworkGameEngine.JobsSystem;
+using System.Diagnostics;
 
 namespace NetworkGameEngine
 {
     public enum MethodType { None = 0, Init, Start, Update, LateUpdate, OnDestroy, UpdateData,
         Command,
-        Prepare
+        Prepare,
+        JobEcxecutor
     }
     public class Workflow
     {
+        private World m_world;
         private Thread m_thread;
         private Object m_locker = new object();
-        private Dictionary<int, GameObject> m_objects = new Dictionary<int, GameObject>();
+        private List<GameObject> m_objects = new List<GameObject>();
         private volatile MethodType m_currentMethod = MethodType.None;
-        private List<MethodType> m_history = new List<MethodType>();
+        private ThreadJobExecutor m_jobExcecutor;
+        //private List<MethodType> m_history = new List<MethodType>();
 
         public bool IsFree => m_currentMethod == MethodType.None;
 
         public int ThreadID { get; private set; }
 
-        public void Init()
+        public void Init(World world)
         {
+            m_world = world;
             m_thread = new Thread(ThreadLoop);
             m_thread.Start();
             ThreadID = m_thread.ManagedThreadId;
         }
 
+        private void InitThread()
+        {
+            m_jobExcecutor = JobsManager.RegisterThreadHandler();
+        }
+
         internal void AddObject(GameObject obj)
         {
-            m_objects.Add(obj.ID, obj);
+            m_objects.Add(obj);
         }
 
         internal void CallMethod(MethodType method)
@@ -42,7 +52,7 @@ namespace NetworkGameEngine
 
         internal void RemoveObject(GameObject removeObj)
         {
-            m_objects.Remove(removeObj.ID); 
+            m_objects.Remove(removeObj); 
         }
 
         internal void Wait()
@@ -55,49 +65,72 @@ namespace NetworkGameEngine
 
         private void ThreadLoop()
         {
+            InitThread();
             lock (m_locker)
             {
                 while (true)
                 {
                     Monitor.Wait(m_locker);
-                    //if(m_objects.Count>0)
-                    //{
 
-                    //}
-                    m_history.Add(m_currentMethod);
-                    switch (m_currentMethod)
+                    int executedObjectIndex = 0;
+                    while (m_currentMethod != MethodType.None)
                     {
-                        case MethodType.Prepare:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallPrepare(); }
-                            break;
-                        case MethodType.Init:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallInit(); }
-                            break;
-                        case MethodType.Start:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallStart(); }
-                            break;
-                        case MethodType.Update:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallUpdate(); }
-                            break;
-                        case MethodType.Command:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallCommand(); }
-                            break;
-                        case MethodType.LateUpdate:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallLateUpdate(); }
-                            break;
-                        case MethodType.OnDestroy:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallOnDestroy(); }
-                            break;
-                        case MethodType.UpdateData:
-                            foreach (GameObject obj in m_objects.Values) { obj.CallUpdateData(); }
-                            break;
-                        default:
-                            throw new Exception("invalid object processing state");
+                        try
+                        {
+                            switch (m_currentMethod)
+                            {
+                                case MethodType.Prepare:
+                                    for(; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
+                                    { m_objects[executedObjectIndex].CallPrepare(); }
+                                    break;
+                                case MethodType.Init:
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    { m_objects[executedObjectIndex].CallInit(); }
+                                    break;
+                                case MethodType.Start:
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
+                                    { m_objects[executedObjectIndex].CallStart(); }
+                                    break;
+                                case MethodType.Update:
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
+                                    { m_objects[executedObjectIndex].CallUpdate(); }
+                                    break;
+                                case MethodType.Command:
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
+                                    { m_objects[executedObjectIndex].CallCommand(); }
+                                    break;
+                                case MethodType.JobEcxecutor:
+                                    m_jobExcecutor.Update();
+                                    break;
+                                case MethodType.LateUpdate:
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
+                                    { m_objects[executedObjectIndex].CallLateUpdate(); }
+                                    break;
+                                case MethodType.OnDestroy:
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    { m_objects[executedObjectIndex].CallOnDestroy(); }
+                                    break;
+                                case MethodType.UpdateData:
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    { m_objects[executedObjectIndex].CallUpdateData(); }
+                                    break;
+                                default:
+                                    throw new Exception("invalid object processing state");
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            m_world.LogError($"Error in {m_objects[executedObjectIndex].Name}.{m_currentMethod} method: {e.Message}");
+                            executedObjectIndex++;
+                            continue;
+                        }
+                        m_currentMethod = MethodType.None;
                     }
-                    m_currentMethod = MethodType.None;
                     Monitor.PulseAll(m_locker);
                 }
             }
         }
+
+      
     }
 }

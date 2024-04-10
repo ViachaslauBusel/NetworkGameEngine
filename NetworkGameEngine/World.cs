@@ -15,7 +15,7 @@ namespace NetworkGameEngine
     }
     public class World
     {
-        private DiContainer m_diContainer = new DiContainer();
+        private ThreadSafeDiContainer m_diContainer = new ThreadSafeDiContainer();
         private ConcurrentDictionary<int, GameObject> m_objects = new ConcurrentDictionary<int, GameObject>();
         private ConcurrentQueue<AddingObjectTask> m_addObjects = new ConcurrentQueue<AddingObjectTask>();
         private ConcurrentQueue<RemovingObjectTask> m_removeObjects = new ConcurrentQueue<RemovingObjectTask>();
@@ -24,11 +24,16 @@ namespace NetworkGameEngine
         private Workflow[] m_workflows;
         private int m_addObjectThIndex = 0;
 
-        internal DiContainer DiContainer => m_diContainer;
+        public event Action<string> OnLog;
+
+        internal ThreadSafeDiContainer DiContainer => m_diContainer;
 
         public void RegisterService<T>(T service)
         {
-            m_diContainer.Bind<T>().FromInstance(service).AsSingle();
+            using (var container = m_diContainer.LockContainer())
+            {
+                container.Container.Bind<T>().FromInstance(service).AsSingle();
+            }
         }
 
 
@@ -38,7 +43,7 @@ namespace NetworkGameEngine
             for (int i = 0; i < m_workflows.Length; i++)
             {
                 m_workflows[i] = new Workflow();
-                m_workflows[i].Init();
+                m_workflows[i].Init(this);
             }
         }
       
@@ -88,6 +93,9 @@ namespace NetworkGameEngine
             foreach (var th in m_workflows) { th.CallMethod(MethodType.Command); }
             foreach (var th in m_workflows) { th.Wait(); }
 
+            foreach (var th in m_workflows) { th.CallMethod(MethodType.JobEcxecutor); }
+            foreach (var th in m_workflows) { th.Wait(); }
+
             foreach (var th in m_workflows) { th.CallMethod(MethodType.LateUpdate); }
             foreach (var th in m_workflows) { th.Wait(); }
 
@@ -119,5 +127,10 @@ namespace NetworkGameEngine
         }
 
         public bool TryGetGameObject(int objectID, out GameObject obj) => m_objects.TryGetValue(objectID, out obj);
+
+        internal void LogError(string msg)
+        {
+            OnLog?.Invoke(msg);
+        }
     }
 }

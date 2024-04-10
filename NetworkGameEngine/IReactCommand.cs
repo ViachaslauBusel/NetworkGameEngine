@@ -2,7 +2,7 @@
 {
     public interface IReactCommand<T> where T: ICommand
     {
-        void ReactCommand(T command);
+        void ReactCommand(ref T command);
     }
     //public interface IReactCommand
     //{
