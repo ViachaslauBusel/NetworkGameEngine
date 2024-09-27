@@ -49,13 +49,24 @@ namespace NetworkGameEngine.JobsSystem
             }
         }
 
+        public void Wait(int waitTime)
+        {
+            lock (_lock)
+            {
+                while (IsCompleted == false)
+                {
+                   Monitor.Wait(_lock, waitTime);
+                }
+            }
+        }
+
         public void Wait()
         {
             lock (_lock)
             {
                 while (IsCompleted == false)
                 {
-                   Monitor.Wait(_lock);
+                    Monitor.Wait(_lock);
                 }
             }
         }
@@ -140,6 +151,18 @@ namespace NetworkGameEngine.JobsSystem
                 }
             }
         }
+
+        public void Wait(int waitTime)
+        {
+            lock (_lock)
+            {
+                while (IsCompleted == false)
+                {
+                    Monitor.Wait(_lock, waitTime);
+                }
+            }
+        }
+
         public void ThrowException(Exception e)
         {
             lock (_lock)

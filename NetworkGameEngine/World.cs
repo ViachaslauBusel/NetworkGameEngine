@@ -1,5 +1,7 @@
-﻿using NetworkGameEngine.Tools;
+﻿using NetworkGameEngine.Interfaces;
+using NetworkGameEngine.Tools;
 using System.Collections.Concurrent;
+using System.Diagnostics.Contracts;
 using Zenject;
 
 namespace NetworkGameEngine
@@ -20,6 +22,8 @@ namespace NetworkGameEngine
         private ConcurrentQueue<AddingObjectTask> m_addObjects = new ConcurrentQueue<AddingObjectTask>();
         private ConcurrentQueue<RemovingObjectTask> m_removeObjects = new ConcurrentQueue<RemovingObjectTask>();
         private List<GameObject> m_removedObjects = new List<GameObject>();
+        private List<IUpdatableService> _updatableServices = new List<IUpdatableService>();
+        private List<IThreadAwareUpdatableService> _threadAwareUpdatableServices = new List<IThreadAwareUpdatableService>();
         private int m_generatorID = 1;
         private Workflow[] m_workflows;
         private int m_addObjectThIndex = 0;
@@ -32,13 +36,33 @@ namespace NetworkGameEngine
         {
             using (var container = m_diContainer.LockContainer())
             {
-                container.Container.Bind<T>().FromInstance(service).AsSingle();
+                container.Container.BindInterfacesAndSelfTo<T>().FromInstance(service).AsSingle();
             }
         }
 
+        public void RegisterService<T>()
+        {
+            using (var container = m_diContainer.LockContainer())
+            {
+                container.Container.BindInterfacesAndSelfTo<T>().FromNew().AsSingle();
+            }
+        }
+
+        public T GetService<T>()
+        {
+            using (var container = m_diContainer.LockContainer())
+            {
+                return container.Container.Resolve<T>();
+            }
+        }
 
         public void Init(int maxThread)
         {
+            using (var container = m_diContainer.LockContainer())
+            {
+                _threadAwareUpdatableServices = container.Container.ResolveAll<IThreadAwareUpdatableService>().OrderBy(u => u.Priority).ToList();
+                _updatableServices = container.Container.ResolveAll<IUpdatableService>().OrderBy(u => u.Priority).ToList();
+            }
             m_workflows = new Workflow[maxThread];
             for (int i = 0; i < m_workflows.Length; i++)
             {
@@ -124,6 +148,17 @@ namespace NetworkGameEngine
                 m_workflows.First(th => th.ThreadID == obj.ThreadID).RemoveObject(obj);
             }
             m_removedObjects.Clear();
+
+            foreach (var service in _updatableServices)
+            {
+                service.Update();
+            }
+
+            foreach (var service in _threadAwareUpdatableServices)
+            {
+                for (int i = 0; i < m_workflows.Length; i++) { m_workflows[i].Execute(() => service.Update(i, m_workflows.Length)); }
+                foreach (var th in m_workflows) { th.Wait(); }
+            }
         }
 
         public bool TryGetGameObject(int objectID, out GameObject obj) => m_objects.TryGetValue(objectID, out obj);

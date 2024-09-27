@@ -5,17 +5,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	  <Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Reference Include="Zenject">
       <HintPath>..\Libs\Zenject.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Zenject-Signals">
       <HintPath>..\Libs\Zenject-Signals.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Zenject-usage">
       <HintPath>..\Libs\Zenject-usage.dll</HintPath>
+      <Private>True</Private>
     </Reference>
   </ItemGroup>
 

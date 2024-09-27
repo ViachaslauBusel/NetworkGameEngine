@@ -6,7 +6,8 @@ namespace NetworkGameEngine
     public enum MethodType { None = 0, Init, Start, Update, LateUpdate, OnDestroy, UpdateData,
         Command,
         Prepare,
-        JobEcxecutor
+        JobEcxecutor,
+        ActionExecuter
     }
     public class Workflow
     {
@@ -14,6 +15,7 @@ namespace NetworkGameEngine
         private Thread m_thread;
         private Object m_locker = new object();
         private List<GameObject> m_objects = new List<GameObject>();
+        private Action _action;
         private volatile MethodType m_currentMethod = MethodType.None;
         private ThreadJobExecutor m_jobExcecutor;
         //private List<MethodType> m_history = new List<MethodType>();
@@ -50,9 +52,20 @@ namespace NetworkGameEngine
             }
         }
 
+        internal void Execute(Action action)
+        {
+            lock (m_locker)
+            {
+                if (m_currentMethod != MethodType.None) throw new Exception("invalid object processing state");
+                _action = action;
+                m_currentMethod = MethodType.ActionExecuter;
+                Monitor.PulseAll(m_locker);
+            }
+        }
+
         internal void RemoveObject(GameObject removeObj)
         {
-            m_objects.Remove(removeObj); 
+            m_objects.Remove(removeObj);
         }
 
         internal void Wait()
@@ -113,6 +126,9 @@ namespace NetworkGameEngine
                                 case MethodType.UpdateData:
                                     for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
                                     { m_objects[executedObjectIndex].CallUpdateData(); }
+                                    break;
+                                case MethodType.ActionExecuter:
+                                    _action?.Invoke();
                                     break;
                                 default:
                                     throw new Exception("invalid object processing state");
