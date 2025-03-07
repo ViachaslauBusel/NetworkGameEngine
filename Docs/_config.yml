@@ -15,4 +15,4 @@ just_the_docs:
 
   # Подключение кастомных стилей
   custom_css:
-    - assets/css/style.css
+    - Docs/assets/css/style.css
