@@ -1,9 +1,25 @@
----
----
-
-$primary-color: #007bff;
-
+/* Изменение цвета фона */
 body {
-    font-family: Arial, sans-serif;
-    color: $primary-color;
+  background-color: #f9f9f9;
+}
+
+/* Стили для заголовков */
+h1 {
+  color: #007bff;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 10px;
+}
+
+h2 {
+  color: #28a745;
+}
+
+/* Стили для ссылок */
+a {
+  color: #ff6347;
+}
+
+a:hover {
+  text-decoration: underline;
+  color: #ff4500;
 }

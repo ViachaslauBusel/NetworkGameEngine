@@ -12,3 +12,7 @@ just_the_docs:
       nav_order: 2
       collapsible: true         # Разворачиваемое меню
       output: true
+
+  # Подключение кастомных стилей
+  custom_css:
+    - assets/css/style.css
