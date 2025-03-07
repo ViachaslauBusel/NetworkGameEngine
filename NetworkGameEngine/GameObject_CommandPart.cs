@@ -1,12 +1,5 @@
 ﻿using NetworkGameEngine.JobsSystem;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using static NetworkGameEngine.GameObject;
 
 namespace NetworkGameEngine
 {
@@ -44,6 +37,7 @@ namespace NetworkGameEngine
             m_isCanceled = true;
         }
     }
+
     internal class CommandContainer<T> : CommandContainer where T : ICommand
     {
         private T m_command;
@@ -61,12 +55,14 @@ namespace NetworkGameEngine
             reactCommand.ReactCommand(ref m_command);
         }
     }
+
     internal abstract class CommandContainer
     {
         internal abstract void Invoke(object cmdListener);
 
         internal abstract Type GetCommandType();
     }
+
     public sealed partial class GameObject
     {
         private Dictionary<Type, List<object>> m_commandListener = new Dictionary<Type, List<object>>();
@@ -76,6 +72,7 @@ namespace NetworkGameEngine
         {
             GetCommandListener(cmdType).Add(reactCommand);
         }
+
         internal void RemoveListener(Type cmdType, object reactCommand)
         {
             GetCommandListener(cmdType).Remove(reactCommand);

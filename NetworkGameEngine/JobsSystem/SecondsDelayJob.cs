@@ -18,7 +18,7 @@ namespace NetworkGameEngine.JobsSystem
             long startTimeStamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             this.predicate = () =>
-            {
+            { 
                 float timer = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - startTimeStamp) / 1_000.0f;
                 return timer >= second;
             };

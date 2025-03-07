@@ -50,10 +50,7 @@ namespace NetworkGameEngine
 
         public T InjectDependenciesIntoObject<T>(T t)
         {
-            using(var diContainer = GameObject.World.DiContainer.LockContainer())
-            {
-                diContainer.Container.Inject(t);
-            }
+            GameObject.InjectDependenciesIntoObject(t);
             return t;
         }
     }

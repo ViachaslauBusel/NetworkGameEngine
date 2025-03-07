@@ -1,6 +1,6 @@
+using Autofac;
 using NetworkGameEngine;
-using NUnit.Framework.Internal.Commands;
-using Zenject;
+using NetworkGameEngine.UnitTests;
 
 namespace Test
 {
@@ -71,32 +71,15 @@ namespace Test
             Console.WriteLine($"Hello from ReactTestCommand:{Thread.CurrentThread.ManagedThreadId}");
         }
     }
-    public class TestWorld
+    public class TestWorld : WorldTestBase
     {
-        private World m_world;
-
-        [SetUp]
-        public void Setup()
+        protected override void BeforeSetUpWorld(out IContainer container)
         {
+            var builder = new ContainerBuilder();
             TestService testService = new TestService()
-            { Name= "TruePass" };
-
-            m_world = new World();
-            m_world.RegisterService<ITestService>(testService);
-            m_world.Init(8);
-            Thread.Sleep(100);
-            Thread th = new Thread(WorldThread);
-            th.Start();
-        }
-
-        private void WorldThread()
-        {
-         
-            while (true)
-            {
-                m_world.Update();
-                Thread.Sleep(100);
-            }
+            { Name = "TruePass" };
+            builder.RegisterInstance<ITestService>(testService);
+            container = builder.Build();
         }
 
         [Test]
@@ -106,12 +89,12 @@ namespace Test
             TestComponent testComponent = new TestComponent();
             testObj.AddComponent(testComponent);  
 
-            int id = await m_world.AddGameObject(testObj);
+            int id = await World.AddGameObject(testObj);
 
             Thread.Sleep(1_000);
             testObj.SendCommand(new TestCommand());
             Thread.Sleep(1_000);
-            m_world.RemoveGameObject(id);
+            World.RemoveGameObject(id);
             Thread.Sleep(1_000);
             Assert.IsTrue(testComponent.m_init == 1);
             Assert.IsTrue(testComponent.m_start== 1);

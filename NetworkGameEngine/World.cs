@@ -1,8 +1,7 @@
-﻿using NetworkGameEngine.Interfaces;
+﻿using Autofac;
+using NetworkGameEngine.Interfaces;
 using NetworkGameEngine.Tools;
 using System.Collections.Concurrent;
-using System.Diagnostics.Contracts;
-using Zenject;
 
 namespace NetworkGameEngine
 {
@@ -15,9 +14,10 @@ namespace NetworkGameEngine
     {
         public int GameObjectID { get; set; }
     }
+    public enum ServiceScope { Singleton, Transient, Cached }
     public class World
     {
-        private ThreadSafeDiContainer m_diContainer = new ThreadSafeDiContainer();
+        private IContainer m_diContainer;
         private ConcurrentDictionary<int, GameObject> m_objects = new ConcurrentDictionary<int, GameObject>();
         private ConcurrentQueue<AddingObjectTask> m_addObjects = new ConcurrentQueue<AddingObjectTask>();
         private ConcurrentQueue<RemovingObjectTask> m_removeObjects = new ConcurrentQueue<RemovingObjectTask>();
@@ -30,39 +30,11 @@ namespace NetworkGameEngine
 
         public event Action<string> OnLog;
 
-        internal ThreadSafeDiContainer DiContainer => m_diContainer;
+        internal IContainer DiContainer => m_diContainer;
 
-        public void RegisterService<T>(T service)
+        public void Init(int maxThread, IContainer container = null)
         {
-            using (var container = m_diContainer.LockContainer())
-            {
-                container.Container.BindInterfacesAndSelfTo<T>().FromInstance(service).AsSingle();
-            }
-        }
-
-        public void RegisterService<T>()
-        {
-            using (var container = m_diContainer.LockContainer())
-            {
-                container.Container.BindInterfacesAndSelfTo<T>().FromNew().AsSingle();
-            }
-        }
-
-        public T GetService<T>()
-        {
-            using (var container = m_diContainer.LockContainer())
-            {
-                return container.Container.Resolve<T>();
-            }
-        }
-
-        public void Init(int maxThread)
-        {
-            using (var container = m_diContainer.LockContainer())
-            {
-                _threadAwareUpdatableServices = container.Container.ResolveAll<IThreadAwareUpdatableService>().OrderBy(u => u.Priority).ToList();
-                _updatableServices = container.Container.ResolveAll<IUpdatableService>().OrderBy(u => u.Priority).ToList();
-            }
+            m_diContainer = container;
             m_workflows = new Workflow[maxThread];
             for (int i = 0; i < m_workflows.Length; i++)
             {

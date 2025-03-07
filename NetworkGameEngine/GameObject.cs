@@ -1,7 +1,7 @@
-﻿using NetworkGameEngine.JobsSystem;
+﻿using Autofac;
+using NetworkGameEngine.DependencyInjection;
 using System.Collections.Concurrent;
-using System.ComponentModel;
-using System.Security.Cryptography;
+using System.Reflection;
 
 namespace NetworkGameEngine
 {
@@ -16,7 +16,7 @@ namespace NetworkGameEngine
         private LinkedList<Component> m_components = new LinkedList<Component>();
         private List<Component> m_newComponents = new List<Component>();
         private List<Component> m_removeComponents = new List<Component>();
-      
+        Dictionary<Type, List<MethodInfo>> m_injectMethodsCache = new Dictionary<Type, List<MethodInfo>>();
 
         public string Name => m_name;
         public int ID { get; private set; }
@@ -24,7 +24,6 @@ namespace NetworkGameEngine
         public bool IsDestroyed => m_isDestroyed;
         public World World => m_world;
 
-      
         public GameObject(string name)
         {
             m_name = name;
@@ -80,7 +79,7 @@ namespace NetworkGameEngine
             {
                 foreach (var @interface in c.GetType().GetInterfaces().Where(x => x.IsGenericType))
                 {
-                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>) 
+                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>)
                         || @interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
                     {
                         AddListener(@interface.GenericTypeArguments[0], c);
@@ -91,21 +90,44 @@ namespace NetworkGameEngine
                     }
                 }
             }
+            //Inject dependencies
             foreach (var c in m_newComponents)
             {
-                using (var DiContainer = m_world.DiContainer.LockContainer())
-                {
-                    DiContainer.Container.Inject(c);
-                }
+                InjectDependenciesIntoObject(c);
             }
         }
 
-            internal void CallInit()
+        internal void InjectDependenciesIntoObject(Object component)
         {
-          
-            foreach (var c in m_newComponents) 
+            var type = component.GetType();
+
+            // Cache method lookup to avoid redundant reflection
+            if (!m_injectMethodsCache.TryGetValue(type, out var methods))
             {
-               if(c.enabled) c.Init();
+                methods = ReflectionHelper.GetAllMethods(type)
+                                          .Where(m => m.GetCustomAttributes(typeof(InjectAttribute), true).Any())
+                                          .ToList();
+
+                m_injectMethodsCache[type] = methods;
+            }
+
+            foreach (var method in methods)
+            {
+                // Cache resolved dependencies for the method parameters
+                var parameters = method.GetParameters()
+                                       .Select(p => m_world.DiContainer.Resolve(p.ParameterType))
+                                       .ToArray();
+
+                method.Invoke(component, parameters);
+            }
+        }
+
+        internal void CallInit()
+        {
+
+            foreach (var c in m_newComponents)
+            {
+                if (c.enabled) c.Init();
             }
         }
 
@@ -143,7 +165,7 @@ namespace NetworkGameEngine
 
         internal void CallOnDestroy()
         {
-            while(m_outgoingComponents.TryTake(out Type removeType))
+            while (m_outgoingComponents.TryTake(out Type removeType))
             {
                 var component = m_components.FirstOrDefault(c => c.GetType() == removeType);
                 if (component != null)

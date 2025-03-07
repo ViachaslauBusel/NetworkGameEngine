@@ -1,5 +1,4 @@
 ﻿using NetworkGameEngine.JobsSystem;
-using System.Diagnostics;
 
 namespace NetworkGameEngine
 {
@@ -18,7 +17,6 @@ namespace NetworkGameEngine
         private Action _action;
         private volatile MethodType m_currentMethod = MethodType.None;
         private ThreadJobExecutor m_jobExcecutor;
-        //private List<MethodType> m_history = new List<MethodType>();
 
         public bool IsFree => m_currentMethod == MethodType.None;
 

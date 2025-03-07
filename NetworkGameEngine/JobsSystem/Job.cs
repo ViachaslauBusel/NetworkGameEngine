@@ -5,19 +5,18 @@ using System.Runtime.ExceptionServices;
 namespace NetworkGameEngine.JobsSystem
 {
     [AsyncMethodBuilder(typeof(AsyncBuilder))]
-    public class Job : IJob, INotifyCompletion
+    public partial class Job : IJob, INotifyCompletion
     {
         private Action _continuation;
         private bool _isCompleted = false;
         private Exception _exception;
-        private object _lock = new object();
+        private readonly object _lock = new object();
 
         public virtual bool IsCompleted => _isCompleted;
         public bool IsFaulted => _exception != null;
         public Exception Exception => _exception;
         public bool GetResult() => _isCompleted;
         public Job GetAwaiter() => this;
-
 
         public Job()
         {
@@ -29,10 +28,9 @@ namespace NetworkGameEngine.JobsSystem
             _continuation += continuation;
         }
 
-
         public void ThrowException(Exception e)
         {
-            lock(_lock)
+            lock (_lock)
             {
                 _exception = e;
                 _isCompleted = true;
@@ -53,9 +51,9 @@ namespace NetworkGameEngine.JobsSystem
         {
             lock (_lock)
             {
-                while (IsCompleted == false)
+                while (!IsCompleted)
                 {
-                   Monitor.Wait(_lock, waitTime);
+                    Monitor.Wait(_lock, waitTime);
                 }
             }
         }
@@ -64,7 +62,7 @@ namespace NetworkGameEngine.JobsSystem
         {
             lock (_lock)
             {
-                while (IsCompleted == false)
+                while (!IsCompleted)
                 {
                     Monitor.Wait(_lock);
                 }
@@ -84,7 +82,7 @@ namespace NetworkGameEngine.JobsSystem
 
         public static Job WhenAll(IEnumerable<IJob> jobs)
         {
-          return JobsManager.Execute(Task.Run(() =>
+            return JobsManager.Execute(Task.Run(() =>
             {
                 foreach (var job in jobs)
                 {
@@ -97,25 +95,16 @@ namespace NetworkGameEngine.JobsSystem
         {
             throw new NotImplementedException();
         }
-
-        //public static async Job WhenAll<K>(IEnumerable<Job<K>> jobs)
-        //{
-        //    foreach (var job in jobs)
-        //    {
-        //        await job;
-        //    }
-        //}
     }
 
     [AsyncMethodBuilder(typeof(AsyncValueBuilder<>))]
     public class Job<T> : IJob, INotifyCompletion
     {
-
         private Action _continuation;
         private bool _isCompleted = false;
         private T _result;
         private Exception _exception;
-        private object _lock = new object();
+        private readonly object _lock = new object();
 
         public bool IsCompleted => _isCompleted;
         public bool IsFaulted => _exception != null;
@@ -130,13 +119,13 @@ namespace NetworkGameEngine.JobsSystem
 
         public T GetResult()
         {
-            if (!_isCompleted) throw new Exception("Job is not completed yet"); 
-            if (_exception != null && _exception is not TimeoutException) ExceptionDispatchInfo.Throw(_exception); ;
+            if (!_isCompleted) throw new Exception("Job is not completed yet");
+            if (_exception != null && _exception is not TimeoutException) ExceptionDispatchInfo.Throw(_exception);
 
             return _result;
         }
 
-        public void OnCompleted(Action continuation) 
+        public void OnCompleted(Action continuation)
         {
             _continuation += continuation;
         }
@@ -145,7 +134,7 @@ namespace NetworkGameEngine.JobsSystem
         {
             lock (_lock)
             {
-                while (IsCompleted == false)
+                while (!IsCompleted)
                 {
                     Monitor.Wait(_lock);
                 }
@@ -156,7 +145,7 @@ namespace NetworkGameEngine.JobsSystem
         {
             lock (_lock)
             {
-                while (IsCompleted == false)
+                while (!IsCompleted)
                 {
                     Monitor.Wait(_lock, waitTime);
                 }
@@ -195,3 +184,4 @@ namespace NetworkGameEngine.JobsSystem
         }
     }
 }
+
