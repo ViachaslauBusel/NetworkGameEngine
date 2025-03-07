@@ -3,13 +3,13 @@ using System;
 
 namespace NetworkGameEngine.JobsSystem
 {
-    public class WaitUntil : Job
+    public class WaitUntilJob : Job
     {
         private Func<bool> predicate;
 
         public override bool IsCompleted => predicate.Invoke();
 
-        public WaitUntil(Func<bool> predicate)
+        public WaitUntilJob(Func<bool> predicate)
         {
             this.predicate = predicate;
         }

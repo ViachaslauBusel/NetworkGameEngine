@@ -112,7 +112,7 @@ namespace NetworkGameEngine
             m_commands.Enqueue(commandContainer);
 
             long endWaitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTime;
-            await new WaitUntil(() => commandContainer.IsCompleted || commandContainer.IsCanceled 
+            await new WaitUntilJob(() => commandContainer.IsCompleted || commandContainer.IsCanceled 
                                 || endWaitTime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             if (commandContainer.IsCompleted == false)
             {
