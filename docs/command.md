@@ -45,7 +45,7 @@ public class SomeComponent : Component, IReactCommand<SomeCommand>
 
 ## Отправка команды с получением результата
 
-ommandAndReturnResult, указав команду и максимальное время ожидания ответа (в миллисекундах):
+SendCommandAndReturnResult, указав команду и максимальное время ожидания ответа (в миллисекундах):
 
 ```csharp
 SomeCommand command = new SomeCommand()
