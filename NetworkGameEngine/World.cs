@@ -32,7 +32,13 @@ namespace NetworkGameEngine
 
         internal IContainer DiContainer => m_diContainer;
 
-        public void Init(int maxThread, IContainer container = null)
+        /// <summary>
+        /// Initialize the world
+        /// </summary>
+        /// <param name="maxThread">Count of threads that will be used to process objects</param>
+        /// <param name="frameInterval">Time between frames</param>
+        /// <param name="container">Container for dependency injection</param>
+        public void Init(int maxThread, int frameInterval, IContainer container = null)
         {
             m_diContainer = container;
             m_workflows = new Workflow[maxThread];
