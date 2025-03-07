@@ -27,10 +27,13 @@ namespace NetworkGameEngine
         private int m_generatorID = 1;
         private Workflow[] m_workflows;
         private int m_addObjectThIndex = 0;
+        private bool m_isWorking = false;
+        private Time m_time;
 
         public event Action<string> OnLog;
 
         internal IContainer DiContainer => m_diContainer;
+        public Time Time => m_time;
 
         /// <summary>
         /// Initialize the world
@@ -40,6 +43,7 @@ namespace NetworkGameEngine
         /// <param name="container">Container for dependency injection</param>
         public void Init(int maxThread, int frameInterval, IContainer container = null)
         {
+            m_time = new Time(frameInterval);
             m_diContainer = container;
             m_workflows = new Workflow[maxThread];
             for (int i = 0; i < m_workflows.Length; i++)
@@ -47,8 +51,28 @@ namespace NetworkGameEngine
                 m_workflows[i] = new Workflow();
                 m_workflows[i].Init(this);
             }
+
+            m_isWorking = true;
+            Thread th = new Thread(WorldThread);
+            th.IsBackground = true;
+            th.Start();
         }
-      
+
+        public void Stop()
+        {
+            m_isWorking = false;
+        }
+
+        private void WorldThread()
+        {
+            while (m_isWorking)
+            {
+                m_time.NextTick();
+                Update();
+                Thread.Sleep(m_time.CalculateSleepTime());
+            }
+        }
+
         public async Task<int> AddGameObject(GameObject obj)
         {
             var task = new AddingObjectTask() { GameObject = obj };
@@ -63,7 +87,7 @@ namespace NetworkGameEngine
             m_removeObjects.Enqueue(new RemovingObjectTask() { GameObjectID = gameObjectID });
         }
 
-        public void Update()
+        internal void Update()
         {
             int addObjectsCount = m_addObjects.Count;
             for (int i = 0; i < addObjectsCount && m_addObjects.TryDequeue(out var task); i++)

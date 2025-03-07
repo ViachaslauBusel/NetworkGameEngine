@@ -23,7 +23,7 @@ public struct SomeData
 Метод UpdateData будет автоматически вызываться в специально отведенное время для записи данных в буфер.
 
 ```csharp
-public class TransformComponent : Component, IReadData<SomeData>
+public class SomeComponent : Component, IReadData<SomeData>
 {
     private int _value;
 

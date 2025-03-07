@@ -82,7 +82,7 @@ namespace NetworkGameEngine.JobsSystem
 
         public static Job WhenAll(IEnumerable<IJob> jobs)
         {
-            return JobsManager.Execute(Task.Run(() =>
+            return Job.Wait(Task.Run(() =>
             {
                 foreach (var job in jobs)
                 {

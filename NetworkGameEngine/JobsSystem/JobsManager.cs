@@ -1,17 +1,13 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Collections.Concurrent;
 
 namespace NetworkGameEngine.JobsSystem
 {
 
-    public static class JobsManager
+    internal static class JobsManager
     {
         private static ConcurrentDictionary<int, ThreadJobExecutor> m_jobsExecutor = new ConcurrentDictionary<int, ThreadJobExecutor>();
 
-        public static ThreadJobExecutor RegisterThreadHandler()
+        internal static ThreadJobExecutor RegisterThreadHandler()
         {
             int thID = Thread.CurrentThread.ManagedThreadId;
             if (m_jobsExecutor.TryAdd(thID, new ThreadJobExecutor(thID)))
@@ -29,17 +25,6 @@ namespace NetworkGameEngine.JobsSystem
                 jobExecutor.AddJob(job);
             }
             else throw new Exception("JobsSystem: this thread is not registered for awaiter processing");
-        }
-
-        public static async Job<T> Execute<T>(Task<T> task)
-        {
-            await task;
-            return task.Result;
-        }
-        
-        public static async Job Execute(Task task)
-        {
-            await task;
         }
     }
 }

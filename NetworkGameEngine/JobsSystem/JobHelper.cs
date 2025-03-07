@@ -27,9 +27,9 @@
         /// </summary>
         /// <param name="task"></param>
         /// <returns></returns>
-        public static Job Wait(Task task)
+        public static async Job Wait(Task task)
         {
-            return JobsManager.Execute(task);
+            await task;
         }
 
         /// <summary>
@@ -38,9 +38,9 @@
         /// <typeparam name="T"></typeparam>
         /// <param name="task"></param>
         /// <returns></returns>
-        public static Job<T> Wait<T>(Task<T> task)
+        public static async Job<T> Wait<T>(Task<T> task)
         {
-            return JobsManager.Execute<T>(task);
+            return await task;
         }
     }
 }
