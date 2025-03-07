@@ -13,6 +13,3 @@ just_the_docs:
       collapsible: true         # Разворачиваемое меню
       output: true
 
-  # Подключение кастомных стилей
-  custom_css:
-    - Docs/assets/css/style.css
