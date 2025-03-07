@@ -106,20 +106,22 @@ namespace NetworkGameEngine
             m_commands.Enqueue(new CommandContainer<T>(command));
         }
 
-        public async Job<TResult> SendCommandAndReturnResult<T, TResult>(T command, int waitTime = 0) where T : ICommand
+        public async Job<CommandResult<TResult>> SendCommandAndReturnResult<T, TResult>(T command, int waitTime = 0) where T : ICommand
         {
            var commandContainer = new CommandContainerWithResut<T, TResult>(command);
             m_commands.Enqueue(commandContainer);
 
             long endWaitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTime;
             await new WaitUntilJob(() => commandContainer.IsCompleted || commandContainer.IsCanceled 
-                                || endWaitTime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                                      || endWaitTime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
             if (commandContainer.IsCompleted == false)
             {
                 commandContainer.Cancel();
-                throw new TimeoutException();
+                return new CommandResult<TResult>(false, default);
             }
-            return commandContainer.Result;
+
+            return new CommandResult<TResult>(true, commandContainer.Result);
         }
     }
 }
