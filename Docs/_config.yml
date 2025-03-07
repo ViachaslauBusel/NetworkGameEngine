@@ -1,0 +1,14 @@
+title: "Моя документация"
+theme: just-the-docs
+baseurl: ""                     # Пусто, если используешь GitHub Pages без подпапок
+url: "https://username.github.io"
+
+# Настройка боковой панели
+nav_order: 1
+just_the_docs:
+  collections:
+    guide:
+      name: "Руководство"
+      nav_order: 2
+      collapsible: true         # Разворачиваемое меню
+      output: true
