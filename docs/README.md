@@ -1,4 +1,4 @@
-# Добро пожаловать в документацию!
+# Добро пожаловать!
 
 [Документация.
 ](https://viachaslaubusel.github.io/NetworkGameEngine/)
