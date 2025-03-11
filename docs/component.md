@@ -1,26 +1,26 @@
 ---
-title: Компонент
+title: Component
 nav_order: 3
 ---
 
-# Порядок выполнения функций событий
+# Event Function Execution Order
 
-- **Init()**: метод в скрипте, выполняющийся один раз при инициализации объекта. Он используется для подготовки объекта перед началом работы.
+- **Init()**: A method in the script that executes once during object initialization. It is used to prepare the object before it starts working.
 
-- **Start()**: метод в скрипте, выполняющийся один раз при инициализации объекта. Он обычно используется для начальной настройки и активизации компонентов после их инициализации.
+- **Start()**: A method in the script that executes once during object initialization. It’s typically used for initial setup and activating components after they have been initialized.
 
-- **Update()**: метод в скрипте, выполняющийся каждый тик. Здесь происходит обновление логики объекта, например, перемещение, проверка состояния и т.д.
+- **Update()**: A method in the script that runs every tick. This is where object logic is updated, such as movement, state checks, and other continuous operations.
 
-- **Command**: обработка команд, полученных игровым объектом. Эти команды могут быть переданы в объект для выполнения в рамках одного цикла обработки.
+- **Command**: Handles commands received by the game object. These commands can be sent to the object for execution within a single processing cycle.
 
-- **Job**: выполнение кода после оператора `await`, если задача внутри `job` выполнена. Этот метод используется для асинхронных операций, которые могут выполняться параллельно с другими задачами.
+- **Job**: Executes code after the await operator if the task inside the job is complete. This method is used for asynchronous operations that can run in parallel with other tasks.
 
-- **LateUpdate()**: метод в скрипте, выполняющийся каждый тик, но после всех вызовов `Update()`. Он предназначен для выполнения логики, которая должна зависеть от изменений, произошедших в ходе обработки в `Update()`.
+- **LateUpdate()**: A method in the script that runs every tick, but after all Update() calls. It’s designed for logic that needs to depend on changes made during Update() processing.
 
-- **OnDestroy()**: метод в скрипте, выполняющийся один раз при удалении объекта или компонента. Этот метод используется для очистки ресурсов и завершения работы объекта.
+- **OnDestroy()**: A method in the script that runs once when an object or component is deleted. This method is used for resource cleanup and object shutdown.
 
-- **UpdateData**: считывание данных в потокобезопасный буфер. Этот метод необходим для работы с многозадачностью, где важно обеспечить безопасность доступа к данным.
+- **UpdateData**: Reads data into a thread-safe buffer. This method is necessary for working with multithreading, ensuring safe access to data.
 
-- **Services**: обработка логики сервисов. Этот этап отвечает за выполнение задач, таких как синхронизация данных между объектами, работа с внешними сервисами и т.д.
+- **Services**: Handles service logic. This stage is responsible for tasks like synchronizing data between objects, interacting with external services, and more.
 
 ![Screenshot of my project](images/component.png)
