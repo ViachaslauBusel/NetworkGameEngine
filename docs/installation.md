@@ -1,52 +1,52 @@
 ---
-title: Установка
+title: Installation
 nav_order: 2
 ---
 
-# Установка
+# Installation
 
-Эта инструкция объясняет, как настроить и запустить мир для обработки объектов `GameObject`. В методе `Init` необходимо указать: 
+This guide explains how to set up and launch a world to process GameObject instances. In the Init method, you need to specify:
 
-- `maxThread`: количество потоков, которые будут задействованы для обработки всех `GameObject`.
-- `frameInterval`: время в миллисекундах, которое будет затрачено на обработку одного тика.
+- **maxThread**: the number of threads that will be used to process all GameObject instances.
+- **frameInterval**: the time in milliseconds that will be spent processing a single tick.
 
-### Пример настройки мира:
+### Example of world configuration:
 
 ```csharp
 World world = new World();
 world.Init(maxThread: 8, frameInterval: 100);
 ```
 
-### Создание и добавление компонентов:
+### Creating and adding components:
 
-Для добавления функционала к объектам GameObject создаются компоненты. Ниже приведен пример создания простого компонента:
+To add functionality to GameObject instances, components are created. Below is an example of creating a simple component:
 
 ```csharp
 public class TestComponent : Component
 {
-    // Логика компонента
+    // Component logic
 }
 ```
 
-После этого компонент можно добавить к объекту GameObject:
+After that, the component can be added to a GameObject:
 
 ```csharp
 GameObject obj = new GameObject("Test");
 obj.AddComponent<TestComponent>();
 ```
 
-Либо с использованием конструктора:
+Or using a constructor:
 
 ```csharp
 obj.AddComponent(new TestComponent());
 ```
 
-### Добавление объектов в мир:
+### Adding objects to the world:
 
-После создания и настройки объекта GameObject, его необходимо добавить в мир для обработки:
+Once a GameObject is created and configured, it must be added to the world for processing:
 
 ```csharp
 world.AddGameObject(obj);
 ```
 
-Теперь все скрипты добавленые к этому GameObject будут обрабатываться в игровом цикле с закреплением за одним из потоков.
+Now, all scripts attached to this GameObject will be processed within the game loop, bound to one of the threads.
