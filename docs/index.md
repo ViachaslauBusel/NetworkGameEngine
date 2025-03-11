@@ -1,12 +1,12 @@
 ---
-title: Главная
+title: Main
 nav_order: 1
 ---
 
-# Добро пожаловать в документацию!
+# Welcome!
 
-Это фреймворк для создания серверной логики игры, который позволяет писать скрипты без необходимости вручную синхронизировать данные. Все объекты изолированы в отдельных потоках, что позволяет распределять нагрузку и улучшать производительность. Вместо блокировки данных (lock), объекты взаимодействуют через команды, что упрощает управление их состоянием и гарантирует безопасность работы с данными. Этот фреймворк идеально подходит для создания масштабируемых серверов, которые эффективно обрабатывают большое количество игроков.
+This is a framework for creating server-side game logic that allows you to write scripts without the need for manual data synchronization. All objects are isolated in separate threads, enabling load distribution and improving performance. Instead of locking data, objects interact through commands, simplifying state management and ensuring data safety. This framework is perfect for building scalable servers that can efficiently handle large numbers of players.
 
-✅ Изолирует состояние — предотвращает гонки данных и проблемы синхронизации.<br>
-✅ Масштабируется — легко распределять объекты по потокам.<br>
-✅ Гибкость логики — команды позволяют изменять поведение объекта, не нарушая его инкапсуляцию.<br>
+✅ State isolation — prevents data races and synchronization issues.<br>
+✅ Scalability — easily distribute objects across threads.<br>
+✅ Logic flexibility — commands allow you to change object behavior without breaking encapsulation.<br>
