@@ -3,13 +3,13 @@ title: Read Data
 nav_order: 5
 ---
 
-# Чтение данных из GameObject
+# Reading Data from GameObject
 
-В архитектуре `GameObject` компоненты из одного объекта не могут напрямую взаимодействовать с компонентами другого объекта. Для безопасного чтения данных из другого `GameObject` используется метод `ReadData`.
+In the GameObject architecture, components from one object cannot directly interact with components of another object. To safely read data from another GameObject, use the ReadData method.
 
-## Создание компонента для хранения и обновления данных
+## Creating a Component for Storing and Updating Data
 
-Сначала создадим структуру, которая будет представлять данные:
+First, let’s create a structure to represent the data:
 
 ```csharp
 public struct SomeData
@@ -19,8 +19,8 @@ public struct SomeData
 
 ```
 
-Регистрация скрипта для обновления данных
-Метод UpdateData будет автоматически вызываться в специально отведенное время для записи данных в буфер.
+Registering a Script to Update Data
+The UpdateData method will be automatically called at a designated time to write data to the buffer.
 
 ```csharp
 public class SomeComponent : Component, IReadData<SomeData>
@@ -34,17 +34,17 @@ public class SomeComponent : Component, IReadData<SomeData>
 }
 ```
 
-## Чтение данных из GameObject
+## Reading Data from GameObject
 
-Чтобы прочитать актуальные данные, достаточно вызвать метод ReadData:
+To read the current data, simply call the ReadData method:
 
 ```csharp
 gameObject.ReadData(out SomeData data);
 ```
 
-## Чтение данных по интерфейсу
+## Reading Data via Interface
 
-Если нужно прочитать данные всех компонентов, реализующих определенный интерфейс, можно использовать ReadAllData:
+If you need to read data from all components implementing a specific interface, you can use ReadAllData:
 
 ```csharp
 public struct SomeData : ISomeData
@@ -54,4 +54,4 @@ public struct SomeData : ISomeData
 List<ISomeData> data = gameObject.ReadAllData<ISomeData>();
 ```
 
-В этом случае возвращается список всех данных, соответствующих интерфейсу ISomeData.
+In this case, a list of all data matching the ISomeData interface will be returned.
