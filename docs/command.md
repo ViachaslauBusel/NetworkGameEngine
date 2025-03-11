@@ -3,13 +3,13 @@ title: Command
 nav_order: 5
 ---
 
-# Взаимодействие GameObject через команды
+# GameObject Interaction via Commands
 
-В архитектуре `GameObject` компоненты из одного объекта не могут напрямую взаимодействовать с компонентами другого объекта. Для вызова метода внутри другого `GameObject` необходимо отправить команду.
+In the GameObject architecture, components of one object cannot directly interact with components of another object. To call a method inside another GameObject, you need to send a command.
 
-## Создание и отправка команды
+## Creating and Sending a Command
 
-Создаем команду, реализующую интерфейс `ICommand`:
+Create a command by implementing the ICommand interface:
 
 ```csharp
 public struct SomeCommand : ICommand
@@ -18,7 +18,7 @@ public struct SomeCommand : ICommand
 }
 ```
 
-Отправка команды:
+Send the command:
 
 ```csharp
 gameObject.SendCommand(new SomeCommand()
@@ -27,25 +27,23 @@ gameObject.SendCommand(new SomeCommand()
 });
 ```
 
-## Обработка команды в компоненте
+## Handling the Command in a Component
 
-Компонент, прикрепленный к GameObject, может подписаться на обработку команды, реализуя интерфейс IReactCommand:
+A component attached to a GameObject can subscribe to handle the command by implementing the IReactCommand interface:
 
 ```csharp
 public class SomeComponent : Component, IReactCommand<SomeCommand>
 {
     public void ReactCommand(ref SomeCommand command)
     {
-        // Обработка команды
+       // Command handling
     }
 }
 ```
 
-Если требуется получить результат выполнения команды, можно использовать метод SendC
+## Sending a Command and Receiving a Result
 
-## Отправка команды с получением результата
-
-SendCommandAndReturnResult, указав команду и максимальное время ожидания ответа (в миллисекундах):
+If you need to get the result of the command execution, you can use the SendCommandAndReturnResult method, sends a command and waits for a response, specifying the maximum wait time in milliseconds:
 
 ```csharp
 SomeCommand command = new SomeCommand()
@@ -57,23 +55,22 @@ CommandResult cmdResult = await gameObject.SendCommandAndReturnResult<SomeComman
 bool result = !cmdResult.IsFailed && cmdResult.Result;
 ```
 
-В данном примере:
+In this example:
+- The command is sent to the object.
+- SendCommandAndReturnResult waits for the command to complete or times out.
+- cmdResult.IsFailed indicates whether there was an error during command processing.
+- If there are no errors, the result is returned in cmdResult.Result.
 
-Команда отправляется объекту.
-SendCommandAndReturnResult ожидает результат выполнения или таймаут.
-cmdResult.IsFailed указывает, была ли ошибка при обработке команды.
-Если ошибок нет, результат возвращается в cmdResult.Result.
+## Handling a Command and Returning a Result
 
-## Обработка команды с возвратом результата
-
-Чтобы обработать команду и вернуть результат, компонент должен реализовать интерфейс IReactCommandWithResult:
+To handle a command and return a result, the component must implement the IReactCommandWithResult interface:
 
 ```csharp
 public class SomeComponent : Component, IReactCommandWithResult<SomeCommand, bool>
 {
     public bool ReactCommand(ref SomeCommand command)
     {
-        // Обработка команды
+        // Command handling
         return true;
     }
 }
