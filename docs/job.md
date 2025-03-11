@@ -3,32 +3,32 @@ title: Job
 nav_order: 4
 ---
 
-# Асинхронное выполнение задач
+# Asynchronous Task Execution
 
-**Job** предоставляет возможность продолжить выполнение кода в том же потоке после оператора `await`. Он инкапсулирует `Task` и ожидает его выполнения или выполнения заданных условий.
+**Job** provides the ability to continue executing code on the same thread after the await operator. It encapsulates a Task and waits for its completion or for specified conditions to be met.
 
-### Ожидание выполнения `Task`
+### Waiting for 'Task' Completion
 
-Для ожидания выполнения асинхронной задачи используйте метод `Job.Wait`. Пример:
+To wait for an asynchronous task to complete, use the Job.Wait method. Example:
 
 ```csharp
 await Job.Wait(Task.Delay(5_000));
-// Выполнение кода будет продолжено в потоке, за которым закреплен GameObject
+// Code execution will continue on the thread associated with the GameObject
 ```
 
-### Ожидание выполнения условия
+### Waiting for a Condition to Be Met
 
-Вы можете ожидать выполнения определенного условия с помощью Job.WaitWhile или Job.WaitUntil. Пример:
+You can wait for a specific condition using Job.WaitWhile or Job.WaitUntil. Example:
 
 ```csharp
 await Job.WaitWhile(() => Time.CurrentMillis < TimeMark);
-// Выполнение кода будет продолжено в потоке, за которым закреплен GameObject
+// Code execution will continue on the thread associated with the GameObject
 ```
 
-### Список всех доступных методов Job
-Job.Delay(int millis) — задержка на указанное количество миллисекунд.<br>
-Job.Delay(float seconds) — задержка на указанное количество секунд.<br>
-Job.WaitUntil(Func<bool> predicate) — ожидание выполнения условия, пока возвращаемое значение функции predicate не станет true.<br>
-Job.WaitWhile(Func<bool> predicate) — ожидание выполнения условия, пока возвращаемое значение функции predicate остается true.<br>
-Job.Wait(Task task) — ожидание завершения задачи Task.<br>
-Job.Wait<T>(Task<T> task) — ожидание завершения задачи Task<T>.<br>
+### List of Available Job Methods
+Job.Delay(int millis) — delays execution for the specified number of milliseconds.<br>
+Job.Delay(float seconds) — delays execution for the specified number of seconds.<br>
+Job.WaitUntil(Func<bool> predicate) — waits until the predicate function returns true.<br>
+Job.WaitWhile(Func<bool> predicate) —  waits while the predicate function returns true.<br>
+Job.Wait(Task task) — waits for the Task to complete.<br>
+Job.Wait<T>(Task<T> task) — waits for the Task<T> to complete and returns the result.<br>
