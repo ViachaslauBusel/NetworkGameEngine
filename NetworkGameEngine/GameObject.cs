@@ -115,7 +115,7 @@ namespace NetworkGameEngine
             {
                 // Cache resolved dependencies for the method parameters
                 var parameters = method.GetParameters()
-                                       .Select(p => m_world.DiContainer.Resolve(p.ParameterType))
+                                       .Select(p => m_world.Resolve(p.ParameterType))
                                        .ToArray();
 
                 method.Invoke(component, parameters);

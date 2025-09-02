@@ -13,11 +13,7 @@ namespace NetworkGameEngine.UnitTests
         {
             BeforeSetUpWorld(out IContainer container);
             m_world = new World();
-            m_world.Init(8, container);
-            Thread.Sleep(100);
-            Thread th = new Thread(WorldThread);
-            th.IsBackground = true;
-            th.Start();
+            m_world.Init(8, 100, container);
             AfterSetUpWorld();
         }
 
@@ -28,15 +24,6 @@ namespace NetworkGameEngine.UnitTests
 
         protected virtual void AfterSetUpWorld()
         {
-        }
-
-        private void WorldThread(object? obj)
-        {
-            while (true)
-            {
-                m_world.Update();
-                Thread.Sleep(100);
-            }
         }
     }
 }

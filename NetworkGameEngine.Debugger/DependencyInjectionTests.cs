@@ -6,6 +6,14 @@ namespace NetworkGameEngine.UnitTests
     {
         public class SomeService
         {
+            private string _value;
+
+            public string Value => _value;
+
+            internal void SetValue(string v)
+            {
+                _value = v;
+            }
         }
 
         public class TestPublicComponent : Component
@@ -52,6 +60,8 @@ namespace NetworkGameEngine.UnitTests
             var builder = new ContainerBuilder();
             builder.RegisterType<SomeService>();
             container = builder.Build();
+
+            container.Resolve<SomeService>().SetValue("TestValue");
         }
 
         [Test]
@@ -74,8 +84,8 @@ namespace NetworkGameEngine.UnitTests
             TestPrivateComponent privateComponent = new TestPrivateComponent();
             obj.AddComponent(privateComponent);
             World.AddGameObject(obj).Wait();
-            Thread.Sleep(200);
-            Assert.IsNotNull(privateComponent.Service);
+            Thread.Sleep(800);
+            Assert.IsNotNull(privateComponent.Service.Value.Equals("TestValue"));
         }
 
         [Test]

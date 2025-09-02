@@ -17,7 +17,7 @@ namespace NetworkGameEngine
     public enum ServiceScope { Singleton, Transient, Cached }
     public class World
     {
-        private IContainer m_diContainer;
+        private List<IContainer> m_containers;
         private ConcurrentDictionary<int, GameObject> m_objects = new ConcurrentDictionary<int, GameObject>();
         private ConcurrentQueue<AddingObjectTask> m_addObjects = new ConcurrentQueue<AddingObjectTask>();
         private ConcurrentQueue<RemovingObjectTask> m_removeObjects = new ConcurrentQueue<RemovingObjectTask>();
@@ -32,8 +32,32 @@ namespace NetworkGameEngine
 
         public event Action<string> OnLog;
 
-        internal IContainer DiContainer => m_diContainer;
         public Time Time => m_time;
+
+
+        public object Resolve(Type type)
+        {
+           foreach (var container in m_containers)
+            {
+                if (container.IsRegistered(type))
+                {
+                    return container.Resolve(type);
+                }
+            }
+            return null;
+        }
+
+        public T Resolve<T>()
+        {
+            foreach (var container in m_containers)
+            {
+                if (container.IsRegistered(typeof(T)))
+                {
+                    return container.Resolve<T>();
+                }
+            }
+            return default;
+        }
 
         /// <summary>
         /// Initialize the world
@@ -44,14 +68,23 @@ namespace NetworkGameEngine
         public void Init(int maxThread, int frameInterval, IContainer container = null)
         {
             m_time = new Time(frameInterval);
-            m_diContainer = container;
             m_workflows = new Workflow[maxThread];
+            m_containers = new List<IContainer>();
+
+            m_containers.Add(container);
+
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance(m_time).AsSelf().SingleInstance();
+            m_containers.Add(builder.Build());
+
             for (int i = 0; i < m_workflows.Length; i++)
             {
                 m_workflows[i] = new Workflow();
                 m_workflows[i].Init(this);
             }
 
+            _updatableServices.AddRange(Resolve<IUpdatableService[]>());
+            _threadAwareUpdatableServices.AddRange(Resolve<IThreadAwareUpdatableService[]>());
             m_isWorking = true;
             Thread th = new Thread(WorldThread);
             th.IsBackground = true;
@@ -67,9 +100,20 @@ namespace NetworkGameEngine
         {
             while (m_isWorking)
             {
-                m_time.NextTick();
-                Update();
-                Thread.Sleep(m_time.CalculateSleepTime());
+                try
+                {
+                    while (true)
+                    {
+                        m_time.NextTick();
+                        Update();
+                        int sleepTime = m_time.CalculateSleepTime();
+                        if(sleepTime > 0) Thread.Sleep(sleepTime);
+                    }
+                } 
+                catch(Exception ex)
+                {
+                    LogError(ex.Message);
+                }
             }
         }
 

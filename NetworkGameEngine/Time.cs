@@ -34,5 +34,6 @@ namespace NetworkGameEngine
         }
 
         public static long Milliseconds => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        public DateTime DateTime => DateTimeOffset.FromUnixTimeMilliseconds(Milliseconds).DateTime;
     }
 }

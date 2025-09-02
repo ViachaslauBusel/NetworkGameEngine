@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NetworkGameEngine.UnitTests;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -37,37 +38,16 @@ namespace NetworkGameEngine.Debugger
             data.OutValue = 1;
         }
     }
-    public class TestCommand
+    public class TestCommand : WorldTestBase
     {
-        private World m_world;
-
-        [SetUp]
-        public void Setup()
-        {
-            m_world = new World();
-            m_world.Init(8);
-            Thread.Sleep(100);
-            Thread th = new Thread(WorldThread);
-            th.Start();
-        }
-
-        private void WorldThread()
-        {
-
-            while (true)
-            {
-                m_world.Update();
-                Thread.Sleep(100);
-            }
-        }
-
+        
         [Test]
         public async Task Test1()
         {
             GameObject gameObject = new GameObject();
             gameObject.AddComponent<TestComponent>();
           //  gameObject.AddComponent<TestInternalComponent>();
-            int objID = await m_world.AddGameObject(gameObject);
+            int objID = await World.AddGameObject(gameObject);
             Thread.Sleep(150);
             gameObject.SendCommand(new TestCMD_0());
             gameObject.SendCommand(new TestCMD_1());

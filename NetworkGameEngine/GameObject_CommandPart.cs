@@ -118,10 +118,10 @@ namespace NetworkGameEngine
             if (commandContainer.IsCompleted == false)
             {
                 commandContainer.Cancel();
-                return new CommandResult<TResult>(false, default);
+                return new CommandResult<TResult>(true, default);
             }
 
-            return new CommandResult<TResult>(true, commandContainer.Result);
+            return new CommandResult<TResult>(false, commandContainer.Result);
         }
     }
 }

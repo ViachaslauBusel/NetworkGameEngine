@@ -1,13 +1,8 @@
 ﻿using NetworkGameEngine.JobsSystem;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace NetworkGameEngine.UnitTests
 {
-    public class ExceptionTest
+    public class ExceptionTest : WorldTestBase
     {
         public abstract class TestComponentBase : Component
         {
@@ -23,7 +18,7 @@ namespace NetworkGameEngine.UnitTests
 
             public override async void Update()
             {
-                await JobsManager.Execute(Task.Run(() =>
+                await Job.Wait(Task.Run(() =>
                 {
                     _isTested = false;
                     if (_value % 2 == 0)
@@ -50,28 +45,6 @@ namespace NetworkGameEngine.UnitTests
             public TestComponent3() : base(3) { }
         }
 
-        private World m_world;
-
-        [SetUp]
-        public void Setup()
-        {
-            m_world = new World();
-            m_world.Init(8);
-            Thread.Sleep(100);
-            Thread th = new Thread(WorldThread);
-            th.IsBackground = true;
-            th.Start();
-        }
-
-        private void WorldThread(object? obj)
-        {
-            while (true)
-            {
-                m_world.Update();
-                Thread.Sleep(100);
-            }
-        }
-
         [Test]
         public void Test1()
         {
@@ -87,9 +60,9 @@ namespace NetworkGameEngine.UnitTests
             obj_1.AddComponent(component_1);
             obj_2.AddComponent(component_2);
 
-            m_world.AddGameObject(obj_0).Wait();
-            m_world.AddGameObject(obj_1).Wait();
-            m_world.AddGameObject(obj_2).Wait();
+            World.AddGameObject(obj_0).Wait();
+            World.AddGameObject(obj_1).Wait();
+            World.AddGameObject(obj_2).Wait();
 
             Thread.Sleep(2_000);
 

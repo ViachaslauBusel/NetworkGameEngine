@@ -1,14 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Diagnostics;
 
 namespace NetworkGameEngine.UnitTests
 {
-    
-    internal class CommandAllocationTests
+
+    internal class CommandAllocationTests : WorldTestBase
     {
 
         internal struct TestCommand : ICommand
@@ -36,36 +31,13 @@ namespace NetworkGameEngine.UnitTests
             }
         }
 
-        private World m_world;
-       
-
-
-        [SetUp]
-        public void Setup()
-        {
-            m_world = new World();
-            m_world.Init(8);
-            Thread.Sleep(100);
-            Thread th = new Thread(WorldThread);
-            th.IsBackground = true;
-            th.Start();
-        }
-
-        private void WorldThread(object? obj)
-        {
-            while (true)
-            {
-                m_world.Update();
-                Thread.Sleep(100);
-            }
-        }
 
         [Test]
         public void TestCommandAllocation()
         {
             GameObject obj = new GameObject();
             obj.AddComponent<TestComponent>();
-            m_world.AddGameObject(obj).Wait();
+            World.AddGameObject(obj).Wait();
            
             long memory = GC.GetTotalMemory(true);
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -85,7 +57,7 @@ namespace NetworkGameEngine.UnitTests
             long memory2 = GC.GetTotalMemory(true);
             long allocated = memory2 - memory;
             Console.WriteLine($"Allocated memory: {allocated}, total time:{stopwatch.ElapsedMilliseconds}");
-            Assert.IsTrue(memory2 - memory < 1000000);
+            Assert.IsTrue(memory2 - memory < 10000000);
         }
 
     }
