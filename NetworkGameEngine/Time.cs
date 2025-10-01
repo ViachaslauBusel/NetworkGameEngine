@@ -33,6 +33,11 @@ namespace NetworkGameEngine
             return (int)(FixedDeltaTimeMillis - (Milliseconds - m_startTickTime));
         }
 
+        internal int CalculateTimeFromTick()
+        {
+            return (int)(Milliseconds - m_startTickTime);
+        }
+
         public static long Milliseconds => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         public DateTime DateTime => DateTimeOffset.FromUnixTimeMilliseconds(Milliseconds).DateTime;
     }

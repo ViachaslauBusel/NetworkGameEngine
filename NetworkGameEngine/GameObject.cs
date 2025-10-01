@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using NetworkGameEngine.DependencyInjection;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace NetworkGameEngine
@@ -10,19 +11,23 @@ namespace NetworkGameEngine
         private string m_name;
         private int m_threadID = 0;
         private bool m_isDestroyed = false;
+        private bool _isActive = true;
         private World m_world;
         private ConcurrentBag<Component> m_incomigComponents = new ConcurrentBag<Component>();
         private ConcurrentBag<Type> m_outgoingComponents = new ConcurrentBag<Type>();
         private LinkedList<Component> m_components = new LinkedList<Component>();
+        private LinkedList<Component> m_updateComponents = new LinkedList<Component>();
+        private LinkedList<Component> m_lateUpdateComponents = new LinkedList<Component>();
         private List<Component> m_newComponents = new List<Component>();
         private List<Component> m_removeComponents = new List<Component>();
         Dictionary<Type, List<MethodInfo>> m_injectMethodsCache = new Dictionary<Type, List<MethodInfo>>();
 
         public string Name => m_name;
-        public int ID { get; private set; }
+        public uint ID { get; private set; }
         public int ThreadID => m_threadID;
         public bool IsDestroyed => m_isDestroyed;
         public World World => m_world;
+        public bool IsActive => _isActive;
 
         public GameObject(string name)
         {
@@ -31,6 +36,20 @@ namespace NetworkGameEngine
         public GameObject()
         {
             m_name = "GameObject";
+        }
+
+        public void SetActive(bool value)
+        {
+            if (m_threadID != Thread.CurrentThread.ManagedThreadId)
+            {
+                throw new InvalidOperationException("Attempting to change active state from a thread that does not own the object");
+            }
+            _isActive = value;
+        }
+
+        public bool IsCurrentThreadOwner()
+        {
+            return m_threadID == Thread.CurrentThread.ManagedThreadId;
         }
 
         public void AddComponent(Component component)//ref 
@@ -63,6 +82,7 @@ namespace NetworkGameEngine
         /// </summary>
         internal void CallPrepare()
         {
+            PrepareIncomingBlockData();
             while (m_incomigComponents.TryTake(out Component newComponent))
             {
                 if (m_components.Any(c => newComponent.GetType() == c.GetType()))
@@ -74,7 +94,7 @@ namespace NetworkGameEngine
                 m_components.AddLast(newComponent);
                 m_newComponents.Add(newComponent);
             }
-            //Register data and command listener
+            //Register command listener
             foreach (var c in m_newComponents)
             {
                 foreach (var @interface in c.GetType().GetInterfaces().Where(x => x.IsGenericType))
@@ -84,10 +104,16 @@ namespace NetworkGameEngine
                     {
                         AddListener(@interface.GenericTypeArguments[0], c);
                     }
-                    else if (@interface.GetGenericTypeDefinition() == typeof(IReadData<>))
-                    {
-                        AddData(@interface.GenericTypeArguments[0], c);
-                    }
+                }
+
+                //Register update and late update components
+                if (c.HasUpdateOverride)
+                {
+                    m_updateComponents.AddLast(c);
+                }
+                if (c.HasLateUpdateOverride)
+                {
+                    m_lateUpdateComponents.AddLast(c);
                 }
             }
             //Inject dependencies
@@ -124,32 +150,34 @@ namespace NetworkGameEngine
 
         internal void CallInit()
         {
-
             foreach (var c in m_newComponents)
             {
-                if (c.enabled) c.Init();
+                 c.Init();
             }
+            CallOnEnableForAllData();
         }
 
         internal void CallStart()
         {
             foreach (var c in m_newComponents) 
             {
-                if(c.enabled) c.Start();
+                c.Start();
             }
             m_newComponents.Clear();
         }
 
         internal void CallUpdate()
         {
-            foreach (var c in m_components) { if(c.enabled) c.Update(); }
+            if (!_isActive) return;
+            foreach (var c in m_updateComponents) { if(c.enabled) c.Update(); }
         }
 
         internal void CallLateUpdate()
         {
-            foreach (var c in m_components) { if(c.enabled) c.LateUpdate(); }
+            if (!_isActive) return;
+            foreach (var c in m_lateUpdateComponents) { if(c.enabled) c.LateUpdate(); }
         }
-        internal void Init(int objectID, int threadID, World world)
+        internal void Init(uint objectID, int threadID, World world)
         {
             ID = objectID;
             m_threadID = threadID;
@@ -160,6 +188,8 @@ namespace NetworkGameEngine
         {
             m_removeComponents.AddRange(m_components);
             m_components.Clear();
+            m_updateComponents.Clear();
+            m_lateUpdateComponents.Clear();
             m_isDestroyed = true;
         }
 
@@ -172,6 +202,8 @@ namespace NetworkGameEngine
                 {
                     m_removeComponents.Add(component);
                     m_components.Remove(component);
+                    m_updateComponents.Remove(component);
+                    m_lateUpdateComponents.Remove(component);
                 }
             }
             foreach (var c in m_removeComponents) { c.OnDestroy(); }
@@ -185,17 +217,17 @@ namespace NetworkGameEngine
                     {
                         RemoveListener(@interface.GenericTypeArguments[0], c);
                     }
-                    else if (@interface.GetGenericTypeDefinition() == typeof(IReadData<>))
-                    {
-                        RemoveData(@interface.GenericTypeArguments[0]);
-                    }
                 }
             }
             m_removeComponents.Clear();
+            PrepareOutgoingBlockData();
         }
 
-        internal T GetComponent<T>() where T : class
+        public T GetComponent<T>() where T : class
         {
+            Debug.Assert(ThreadID == Thread.CurrentThread.ManagedThreadId,
+                   "Was called by a thread that does not own this data");
+
             var value = m_components.FirstOrDefault(c => c is T);
             if (value != null)
             {
@@ -206,6 +238,9 @@ namespace NetworkGameEngine
 
         internal List<T> GetComponents<T>() where T : class
         {
+            Debug.Assert(ThreadID == Thread.CurrentThread.ManagedThreadId,
+                                  "Was called by a thread that does not own this data");
+
             List<T> components = new List<T>();
             foreach (var c in m_components)
             {

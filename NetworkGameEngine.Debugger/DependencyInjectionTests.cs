@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using NetworkGameEngine.Sync;
 
 namespace NetworkGameEngine.UnitTests
 {
@@ -91,6 +92,7 @@ namespace NetworkGameEngine.UnitTests
         [Test]
         public void TestBaseInjection()
         {
+            SyncMarkerType test = SyncMarkerType.Local;
             GameObject obj = new GameObject();
             TestBaseComponent baseComponent = new TestBaseComponent();
             obj.AddComponent(baseComponent);

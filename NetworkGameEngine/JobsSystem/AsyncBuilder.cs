@@ -55,7 +55,7 @@ namespace NetworkGameEngine.JobsSystem
 
         public AsyncBuilder(Job awaiter)
         {
-        _awaiter = awaiter;
+            _awaiter = awaiter;
         }
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine

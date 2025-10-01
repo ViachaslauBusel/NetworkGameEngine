@@ -8,23 +8,23 @@ namespace NetworkGameEngine
     public class AddingObjectTask : TaskBase
     {
        public GameObject GameObject { get; set; }
-        public int GameObjectID { get; set; } = 0;
+        public uint GameObjectID { get; set; } = 0;
     }
     public class RemovingObjectTask : TaskBase
     {
-        public int GameObjectID { get; set; }
+        public uint GameObjectID { get; set; }
     }
     public enum ServiceScope { Singleton, Transient, Cached }
     public class World
     {
         private List<IContainer> m_containers;
-        private ConcurrentDictionary<int, GameObject> m_objects = new ConcurrentDictionary<int, GameObject>();
+        private ConcurrentDictionary<uint, GameObject> m_objects = new ConcurrentDictionary<uint, GameObject>();
         private ConcurrentQueue<AddingObjectTask> m_addObjects = new ConcurrentQueue<AddingObjectTask>();
         private ConcurrentQueue<RemovingObjectTask> m_removeObjects = new ConcurrentQueue<RemovingObjectTask>();
         private List<GameObject> m_removedObjects = new List<GameObject>();
         private List<IUpdatableService> _updatableServices = new List<IUpdatableService>();
         private List<IThreadAwareUpdatableService> _threadAwareUpdatableServices = new List<IThreadAwareUpdatableService>();
-        private int m_generatorID = 1;
+        private uint m_generatorID = 1;
         private Workflow[] m_workflows;
         private int m_addObjectThIndex = 0;
         private bool m_isWorking = false;
@@ -71,7 +71,8 @@ namespace NetworkGameEngine
             m_workflows = new Workflow[maxThread];
             m_containers = new List<IContainer>();
 
-            m_containers.Add(container);
+            if(container != null)
+                m_containers.Add(container);
 
             var builder = new ContainerBuilder();
             builder.RegisterInstance(m_time).AsSelf().SingleInstance();
@@ -106,6 +107,7 @@ namespace NetworkGameEngine
                     {
                         m_time.NextTick();
                         Update();
+                        Console.Title = $"NetworkGameEngine | Tick: {m_time.CalculateTimeFromTick()} ms | Objects: {m_objects.Count}";
                         int sleepTime = m_time.CalculateSleepTime();
                         if(sleepTime > 0) Thread.Sleep(sleepTime);
                     }
@@ -117,7 +119,7 @@ namespace NetworkGameEngine
             }
         }
 
-        public async Task<int> AddGameObject(GameObject obj)
+        public async Task<uint> AddGameObject(GameObject obj)
         {
             var task = new AddingObjectTask() { GameObject = obj };
             m_addObjects.Enqueue(task);
@@ -126,7 +128,7 @@ namespace NetworkGameEngine
             return task.GameObjectID;
         }
 
-        public void RemoveGameObject(int gameObjectID) 
+        public void RemoveGameObject(uint gameObjectID) 
         {
             m_removeObjects.Enqueue(new RemovingObjectTask() { GameObjectID = gameObjectID });
         }
@@ -207,7 +209,7 @@ namespace NetworkGameEngine
             }
         }
 
-        public bool TryGetGameObject(int objectID, out GameObject obj) => m_objects.TryGetValue(objectID, out obj);
+        public bool TryGetGameObject(uint objectID, out GameObject obj) => m_objects.TryGetValue(objectID, out obj);
 
         internal void LogError(string msg)
         {

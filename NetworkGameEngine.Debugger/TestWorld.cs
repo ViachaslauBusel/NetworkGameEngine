@@ -89,7 +89,7 @@ namespace Test
             TestComponent testComponent = new TestComponent();
             testObj.AddComponent(testComponent);  
 
-            int id = await World.AddGameObject(testObj);
+            uint id = await World.AddGameObject(testObj);
 
             Thread.Sleep(1_000);
             testObj.SendCommand(new TestCommand());

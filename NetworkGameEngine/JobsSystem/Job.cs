@@ -71,13 +71,16 @@ namespace NetworkGameEngine.JobsSystem
 
         public bool TryFinalize()
         {
-            if (IsCompleted)
+            lock (_lock)
             {
-                _continuation?.Invoke();
-                _continuation = null;
-                return true;
+                if (IsCompleted)
+                {
+                    _continuation?.Invoke();
+                    _continuation = null;
+                    return true;
+                }
+                return false;
             }
-            return false;
         }
 
         public static Job WhenAll(IEnumerable<IJob> jobs)
@@ -174,13 +177,16 @@ namespace NetworkGameEngine.JobsSystem
 
         public bool TryFinalize()
         {
-            if (IsCompleted)
+            lock (_lock)
             {
-                _continuation?.Invoke();
-                _continuation = null;
-                return true;
+                if (IsCompleted)
+                {
+                    _continuation?.Invoke();
+                    _continuation = null;
+                    return true;
+                }
+                return false;
             }
-            return false;
         }
     }
 }
