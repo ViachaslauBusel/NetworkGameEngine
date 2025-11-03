@@ -32,6 +32,10 @@ namespace NetworkGameEngine
 
         private void InitThread()
         {
+            // Устанавливаем контекст синхронизации на поток мира ДО любых async-операций
+            System.Threading.SynchronizationContext.SetSynchronizationContext(
+                new NetworkGameEngine.JobsSystem.EngineSynchronizationContext(m_world));
+
             m_jobExcecutor = JobsManager.RegisterThreadHandler(m_world);
         }
 

@@ -100,6 +100,10 @@ namespace NetworkGameEngine
 
         private void WorldThread()
         {
+            // Устанавливаем контекст синхронизации на поток мира ДО любых async-операций
+            System.Threading.SynchronizationContext.SetSynchronizationContext(
+                new NetworkGameEngine.JobsSystem.EngineSynchronizationContext(this));
+
             while (m_isWorking)
             {
                 try

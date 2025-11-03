@@ -35,7 +35,7 @@ namespace NetworkGameEngine.UnitTests
                 await Job.Delay(10);
                     if (_value % 2 == 0)
                     {
-                        throw new Exception("Test exception");
+                        throw new Exception("Test exception after await");
                     }
                     _isTested = true;
             }

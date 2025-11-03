@@ -127,7 +127,7 @@ namespace NetworkGameEngine
             m_commands.Enqueue(commandContainer);
 
             long endWaitTime = Time.Milliseconds + waitTime;
-            await new WaitUntilJob(() => commandContainer.IsCompleted
+            await Job.WaitUntil(() => commandContainer.IsCompleted
                                       || commandContainer.IsCanceled
                                       || endWaitTime < Time.Milliseconds);
 

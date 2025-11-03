@@ -1,11 +1,4 @@
-﻿using NetworkGameEngine.JobsSystem;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace NetworkGameEngine.JobsSystem
+﻿namespace NetworkGameEngine.JobsSystem
 {
     public sealed class SecondsDelayJob : Job
     {
