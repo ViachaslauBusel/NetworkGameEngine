@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace NetworkGameEngine
+﻿namespace NetworkGameEngine
 {
     public class Time
     {
@@ -38,7 +32,33 @@ namespace NetworkGameEngine
             return (int)(Milliseconds - m_startTickTime);
         }
 
-        public static long Milliseconds => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        public DateTime DateTime => DateTimeOffset.FromUnixTimeMilliseconds(Milliseconds).DateTime;
+        public static long Milliseconds => Environment.TickCount64;
+
+        public static DateTime DateTime => DateTime.Now;
+
+        public static long CalculateMsUntil(DateTime futureTime)
+        {
+            return (long)(futureTime - DateTime).TotalMilliseconds;
+        }
+
+        public static long ConvertDateTimeToMs(DateTime time)
+        {
+            return Milliseconds + CalculateMsUntil(time);
+        }
+
+        public static long AddSecondsToMs(int totalSeconds)
+        {
+            return Milliseconds + (totalSeconds * 1000);
+        }
+
+        public static DateTime AddSecondsToDateTime(int totalSeconds)
+        {
+            return DateTime.AddSeconds(totalSeconds);
+        }
+
+        public static DateTime AddMsToDateTime(long totalMs)
+        {
+            return DateTime.AddMilliseconds(totalMs);
+        }
     }
 }

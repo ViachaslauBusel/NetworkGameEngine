@@ -7,7 +7,7 @@ namespace NetworkGameEngine.UnitTests
 {
     internal class TestNewReadData : WorldTestBase
     {
-        public class TestSharedData : DataBlock
+        public class TestSharedData : LocalModel
         {
             protected Vector3 _position;
 
@@ -37,7 +37,7 @@ namespace NetworkGameEngine.UnitTests
 
             public override void Init()
             {
-                _data = GetData<TestSharedData>();
+                _data = GetModel<TestSharedData>();
             }
 
             public override void LateUpdate()
@@ -61,7 +61,7 @@ namespace NetworkGameEngine.UnitTests
 
             public override void LateUpdate()
             {
-                _obj.TryGetData(out TestSharedData data);
+                _obj.TryGetModel(out TestSharedData data);
                 TestValue = data?.value ?? -1;
                 TestPosition = data?.Position ?? Vector3.Zero;
             }
@@ -74,7 +74,7 @@ namespace NetworkGameEngine.UnitTests
             TestShareDataContainer data = new TestShareDataContainer();
             data.value = 42;
             data.Position = new Vector3(1, 2, 3);
-            gameObject_0.AddData(data);
+            gameObject_0.AddModel(data);
             gameObject_0.AddComponent<TestWriteDataComponent>();
 
             var gameObject_1 = new GameObject();

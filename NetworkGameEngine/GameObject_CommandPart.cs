@@ -23,18 +23,27 @@ namespace NetworkGameEngine
 
         internal override void Invoke(object cmdListener)
         {
-            if (m_isCanceled)
+            lock (this)
             {
+                if (m_isCanceled)
+                {
+                    m_isCompleted = true;
+                    return;
+                }
+                IReactCommandWithResult<T, TResult> reactCommand = cmdListener as IReactCommandWithResult<T, TResult>;
+                m_result = reactCommand.ReactCommand(ref m_command);
                 m_isCompleted = true;
-                return;
             }
-            IReactCommandWithResult<T, TResult> reactCommand = cmdListener as IReactCommandWithResult<T, TResult>;
-            m_result = reactCommand.ReactCommand(ref m_command);
-            m_isCompleted = true;
         }
-        internal void Cancel()
+
+        internal bool TryCancel()
         {
-            m_isCanceled = true;
+            lock (this)
+            {
+                if (m_isCompleted) return false;
+                m_isCanceled = true;
+                return true;
+            }
         }
     }
 
@@ -88,14 +97,20 @@ namespace NetworkGameEngine
             return m_commandListener[type];
         }
 
-        //
         internal void CallCommand()
         {
             while (m_commands.TryDequeue(out CommandContainer cmd))
             {
-                foreach (var cmdListener in GetCommandListener(cmd.GetCommandType()))
+                foreach (var listener in GetCommandListener(cmd.GetCommandType()))
                 {
-                    cmd.Invoke(cmdListener);
+                    try
+                    {
+                        cmd.Invoke(listener);
+                    }
+                    catch (Exception ex)
+                    {
+                        m_world.LogError($"GameObject Command processing error in {listener.GetType()}: {ex}");
+                    }
                 }
             }
         }
@@ -111,13 +126,14 @@ namespace NetworkGameEngine
            var commandContainer = new CommandContainerWithResut<T, TResult>(command);
             m_commands.Enqueue(commandContainer);
 
-            long endWaitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTime;
-            await new WaitUntilJob(() => commandContainer.IsCompleted || commandContainer.IsCanceled 
-                                      || endWaitTime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            long endWaitTime = Time.Milliseconds + waitTime;
+            await new WaitUntilJob(() => commandContainer.IsCompleted
+                                      || commandContainer.IsCanceled
+                                      || endWaitTime < Time.Milliseconds);
 
-            if (commandContainer.IsCompleted == false)
+
+            if (!commandContainer.IsCompleted && commandContainer.TryCancel())
             {
-                commandContainer.Cancel();
                 return new CommandResult<TResult>(true, default);
             }
 

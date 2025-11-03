@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using NetworkGameEngine.DependencyInjection;
+using NetworkGameEngine.JobsSystem;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
@@ -13,7 +14,7 @@ namespace NetworkGameEngine
         private bool m_isDestroyed = false;
         private bool _isActive = true;
         private World m_world;
-        private ConcurrentBag<Component> m_incomigComponents = new ConcurrentBag<Component>();
+        private ConcurrentQueue<Component> m_incomigComponents = new ConcurrentQueue<Component>();
         private ConcurrentBag<Type> m_outgoingComponents = new ConcurrentBag<Type>();
         private LinkedList<Component> m_components = new LinkedList<Component>();
         private LinkedList<Component> m_updateComponents = new LinkedList<Component>();
@@ -52,19 +53,37 @@ namespace NetworkGameEngine
             return m_threadID == Thread.CurrentThread.ManagedThreadId;
         }
 
-        public void AddComponent(Component component)//ref 
+        public async Job<bool> AddComponentAsync(Component component)//ref 
         {
            //if(m_threadID != 0 && m_threadID != Thread.CurrentThread.ManagedThreadId)
            //{
            //    // Debug.Log.Fatal($"Attempting to add a component to a thread that does not own the object");
            //}
            
-            m_incomigComponents.Add(component);
+            m_incomigComponents.Enqueue(component);
+
+            await Job.WaitWhile(() => component.State == ComponentState.None && !IsDestroyed);
+            return component.State != ComponentState.Error && component.State != ComponentState.None && !IsDestroyed;
+        }
+
+        public async Job<bool> AddComponentAsync<T>() where T : Component, new()
+        {
+           return await AddComponentAsync(new T());  
+        }
+
+        public void AddComponent(Component component)//ref 
+        {
+            //if(m_threadID != 0 && m_threadID != Thread.CurrentThread.ManagedThreadId)
+            //{
+            //    // Debug.Log.Fatal($"Attempting to add a component to a thread that does not own the object");
+            //}
+
+            m_incomigComponents.Enqueue(component);
         }
 
         public void AddComponent<T>() where T : Component, new()
         {
-            AddComponent(new T());  
+             AddComponent(new T());
         }
 
         public void DestroyComponent<T>() 
@@ -83,10 +102,11 @@ namespace NetworkGameEngine
         internal void CallPrepare()
         {
             PrepareIncomingBlockData();
-            while (m_incomigComponents.TryTake(out Component newComponent))
+            while (m_incomigComponents.TryDequeue(out Component newComponent))
             {
                 if (m_components.Any(c => newComponent.GetType() == c.GetType()))
                 {
+                    newComponent.InternalSetError();
                     //  Debug.Log.Error($"It is impossible to re-add a component, such a component already exists on the object");
                     continue;
                 }
@@ -123,7 +143,7 @@ namespace NetworkGameEngine
             }
         }
 
-        internal void InjectDependenciesIntoObject(Object component)
+        public void InjectDependenciesIntoObject(Object component)
         {
             var type = component.GetType();
 
@@ -152,7 +172,14 @@ namespace NetworkGameEngine
         {
             foreach (var c in m_newComponents)
             {
-                 c.Init();
+                try
+                {
+                    c.Init();
+                }
+                catch (Exception ex)
+                {
+                    m_world.LogError($"Exception in Init of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
+                }
             }
             CallOnEnableForAllData();
         }
@@ -161,7 +188,14 @@ namespace NetworkGameEngine
         {
             foreach (var c in m_newComponents) 
             {
-                c.Start();
+                try
+                {
+                    c.Start();
+                }
+                catch (Exception ex)
+                {
+                    m_world.LogError($"Exception in Start of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
+                }
             }
             m_newComponents.Clear();
         }
@@ -169,14 +203,41 @@ namespace NetworkGameEngine
         internal void CallUpdate()
         {
             if (!_isActive) return;
-            foreach (var c in m_updateComponents) { if(c.enabled) c.Update(); }
+            foreach (var c in m_updateComponents)
+            {
+                if (c.enabled)
+                {
+                    try
+                    {
+                        c.Update();
+                    }
+                    catch (Exception ex)
+                    {
+                        m_world.LogError($"Exception in Update of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
+                    }
+                }
+            }
         }
 
         internal void CallLateUpdate()
         {
             if (!_isActive) return;
-            foreach (var c in m_lateUpdateComponents) { if(c.enabled) c.LateUpdate(); }
+            foreach (var c in m_lateUpdateComponents)
+            {
+                if (c.enabled)
+                {
+                    try
+                    {
+                        c.LateUpdate();
+                    }
+                    catch (Exception ex)
+                    {
+                        m_world.LogError($"Exception in LateUpdate of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
+                    }
+                }
+            }
         }
+
         internal void Init(uint objectID, int threadID, World world)
         {
             ID = objectID;
@@ -200,13 +261,24 @@ namespace NetworkGameEngine
                 var component = m_components.FirstOrDefault(c => c.GetType() == removeType);
                 if (component != null)
                 {
+                    component.InternalDestroy();
                     m_removeComponents.Add(component);
                     m_components.Remove(component);
                     m_updateComponents.Remove(component);
                     m_lateUpdateComponents.Remove(component);
                 }
             }
-            foreach (var c in m_removeComponents) { c.OnDestroy(); }
+            foreach (var c in m_removeComponents) 
+            {
+                try
+                {
+                    c.OnDestroy();
+                }
+                catch (Exception ex)
+                {
+                    m_world.LogError($"Exception in OnDestroy of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
+                }
+            }
             //Unregister command listener
             foreach (var c in m_removeComponents)
             {

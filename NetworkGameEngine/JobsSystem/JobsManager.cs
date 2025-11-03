@@ -7,10 +7,10 @@ namespace NetworkGameEngine.JobsSystem
     {
         private static ConcurrentDictionary<int, ThreadJobExecutor> m_jobsExecutor = new ConcurrentDictionary<int, ThreadJobExecutor>();
 
-        internal static ThreadJobExecutor RegisterThreadHandler()
+        internal static ThreadJobExecutor RegisterThreadHandler(World world)
         {
             int thID = Thread.CurrentThread.ManagedThreadId;
-            if (m_jobsExecutor.TryAdd(thID, new ThreadJobExecutor(thID)))
+            if (m_jobsExecutor.TryAdd(thID, new ThreadJobExecutor(thID, world)))
             {
                 return m_jobsExecutor[thID];
             }

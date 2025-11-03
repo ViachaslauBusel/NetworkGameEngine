@@ -32,22 +32,12 @@ namespace NetworkGameEngine.UnitTests
 
             public override async void LateUpdate()
             {
-                try
-                {
-                    await Job.Delay(10);
+                await Job.Delay(10);
                     if (_value % 2 == 0)
                     {
                         throw new Exception("Test exception");
                     }
-                }
-                catch (Exception)
-                {
-                    // Handle exception if needed
-                }
-                finally
-                {
                     _isTested = true;
-                }
             }
         }
 

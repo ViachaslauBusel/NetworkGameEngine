@@ -33,7 +33,8 @@ namespace NetworkGameEngine
         public event Action<string> OnLog;
 
         public Time Time => m_time;
-
+        public int ActiveGameObjectCount => m_objects.Count;
+        public int PendingGameObjectAddCount => m_addObjects.Count;
 
         public object Resolve(Type type)
         {
@@ -135,7 +136,7 @@ namespace NetworkGameEngine
 
         internal void Update()
         {
-            int addObjectsCount = m_addObjects.Count;
+            int addObjectsCount = Math.Min(100, m_addObjects.Count);
             for (int i = 0; i < addObjectsCount && m_addObjects.TryDequeue(out var task); i++)
             {
                 GameObject obj = task.GameObject;
@@ -210,6 +211,15 @@ namespace NetworkGameEngine
         }
 
         public bool TryGetGameObject(uint objectID, out GameObject obj) => m_objects.TryGetValue(objectID, out obj);
+        public GameObject FindGameObject(Predicate<GameObject> match)
+        {
+            foreach (var obj in m_objects.Values)
+            {
+                if (match(obj))
+                    return obj;
+            }
+            return null;
+        }
 
         internal void LogError(string msg)
         {

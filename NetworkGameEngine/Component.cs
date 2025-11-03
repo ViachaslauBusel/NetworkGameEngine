@@ -4,14 +4,15 @@ using System.Reflection;
 
 namespace NetworkGameEngine
 {
+    internal enum ComponentState
+    {
+        None = 0,
+        Initialized,
+        Destroyed,
+        Error
+    }
     public abstract class Component
     {
-        private GameObject m_gameObject;
-
-        public GameObject GameObject => m_gameObject;
-
-        public bool enabled = true;
-
         // Cached override detection >>>
         private readonly struct OverrideInfo
         {
@@ -23,6 +24,15 @@ namespace NetworkGameEngine
                 LateUpdate = lateUpdate;
             }
         }
+
+        private GameObject m_gameObject;
+        private volatile ComponentState m_state = ComponentState.None;
+
+        public GameObject GameObject => m_gameObject;
+        internal ComponentState State => m_state;
+        public bool enabled = true;
+
+
 
         private static readonly ConcurrentDictionary<Type, OverrideInfo> s_overrideCache = new();
 
@@ -53,6 +63,15 @@ namespace NetworkGameEngine
         internal void InternalInit(GameObject obj)
         {
             m_gameObject = obj;
+            m_state = ComponentState.Initialized;
+        }
+        internal void InternalDestroy()
+        {
+            m_state = ComponentState.Destroyed;
+        }
+        internal void InternalSetError()
+        {
+            m_state = ComponentState.Error;
         }
         public virtual void Init() { }
         public virtual void Start() { }
@@ -77,14 +96,21 @@ namespace NetworkGameEngine
             m_gameObject.DestroyComponent<T>();
         }
 
+        public void DestroyComponent(Component component)
+        {
+            Debug.Assert(m_gameObject.ThreadID == Thread.CurrentThread.ManagedThreadId,
+                                                             "Was called by a thread that does not own this data");
+            m_gameObject.DestroyComponent(component);
+        }
+
         public T InjectDependenciesIntoObject<T>(T t)
         {
             GameObject.InjectDependenciesIntoObject(t);
             return t;
         }
 
-        public T GetData<T>(int key = 0) where T : DataBlock => m_gameObject.GetData<T>(key);
-        public List<T> GetAllData<T>() where T : DataBlock => m_gameObject.GetAllData<T>();
-        public bool TryGetData<T>(int key, out T result) where T : DataBlock => m_gameObject.TryGetData<T>(key, out result);
+        public T GetModel<T>(int key = 0) where T : LocalModel => m_gameObject.GetModel<T>(key);
+        public List<T> GetAllModel<T>() where T : LocalModel => m_gameObject.GetAllModel<T>();
+        public bool TryGetModel<T>(int key, out T result) where T : LocalModel => m_gameObject.TryGetModel<T>(key, out result);
     }
 }

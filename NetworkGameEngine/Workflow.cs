@@ -32,7 +32,7 @@ namespace NetworkGameEngine
 
         private void InitThread()
         {
-            m_jobExcecutor = JobsManager.RegisterThreadHandler();
+            m_jobExcecutor = JobsManager.RegisterThreadHandler(m_world);
         }
 
         internal void AddObject(GameObject obj)
@@ -126,7 +126,14 @@ namespace NetworkGameEngine
                                     { m_objects[executedObjectIndex].CallUpdateData(); }
                                     break;
                                 case MethodType.ActionExecuter:
-                                    _action?.Invoke();
+                                    try
+                                    {
+                                        _action?.Invoke();
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        m_world.LogError($"Error in Workflow ActionExecuter: {e.Message}");
+                                    }
                                     break;
                                 default:
                                     throw new Exception("invalid object processing state");

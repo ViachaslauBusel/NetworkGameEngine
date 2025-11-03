@@ -13,7 +13,7 @@ namespace NetworkGameEngine.UnitTests
         {
             BeforeSetUpWorld(out IContainer container);
             m_world = new World();
-            m_world.Init(8, 100, container);
+            m_world.Init(1, 100, container);
             AfterSetUpWorld();
         }
 

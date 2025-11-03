@@ -3,6 +3,7 @@
     public class SyncMarkers
     {
         private Dictionary<SyncMarkerType, bool> _markers = new();
+        private bool _isDirty = false;
 
         public SyncMarkers()
         {
@@ -57,6 +58,21 @@
                 return isDirty;
             }
             return false;
+        }
+
+        internal void MarkInternalDirty()
+        {
+            _isDirty = true;
+        }
+
+        internal bool IsInternalDirty()
+        {
+            return _isDirty;
+        }
+
+        internal void MarkInternalClean()
+        {
+            _isDirty = false;
         }
     }
 }

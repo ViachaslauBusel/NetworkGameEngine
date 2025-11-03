@@ -5,11 +5,13 @@ namespace NetworkGameEngine.JobsSystem
     public class ThreadJobExecutor
     {
         private int m_threadID;
+        private World m_world;
         private LinkedList<IJob> m_jobs = new LinkedList<IJob>();
 
-        public ThreadJobExecutor(int thId)
+        public ThreadJobExecutor(int thId, World world)
         {
             m_threadID = thId;
+            m_world = world;
         }
 
         public void Update()
@@ -24,8 +26,16 @@ namespace NetworkGameEngine.JobsSystem
             while (node != null)
             {
                 LinkedListNode<IJob> next = node.Next;
-                if (node.Value.TryFinalize())
+                try
                 {
+                    if (node.Value.TryFinalize())
+                    {
+                        m_jobs.Remove(node);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    m_world.LogError("Exception during job finalization: " + ex);
                     m_jobs.Remove(node);
                 }
                 node = next;

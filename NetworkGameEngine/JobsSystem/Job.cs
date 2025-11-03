@@ -15,7 +15,13 @@ namespace NetworkGameEngine.JobsSystem
         public virtual bool IsCompleted => _isCompleted;
         public bool IsFaulted => _exception != null;
         public Exception Exception => _exception;
-        public bool GetResult() => _isCompleted;
+        public bool GetResult()
+        {
+            if (!_isCompleted) throw new InvalidOperationException("Job is not completed yet");
+            if (_exception != null && _exception is not TimeoutException)
+                ExceptionDispatchInfo.Throw(_exception);
+            return true;
+        }
         public Job GetAwaiter() => this;
 
         public Job()

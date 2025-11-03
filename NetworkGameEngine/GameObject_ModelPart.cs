@@ -17,8 +17,8 @@ namespace NetworkGameEngine
     {
         public readonly Type Type;
         public readonly int Key;
-        public readonly DataBlock Data;
-        public DataAddRequest(Type type, int key, DataBlock data)
+        public readonly LocalModel Data;
+        public DataAddRequest(Type type, int key, LocalModel data)
         {
             Type = type; Key = key; Data = data;
         }
@@ -27,17 +27,17 @@ namespace NetworkGameEngine
     public partial class GameObject
     {
         // Основное хранилище данных — модифицируется только потоком-владельцем
-        private readonly Dictionary<Type, Dictionary<int, DataBlock>> _dataStore = new();
+        private readonly Dictionary<Type, Dictionary<int, LocalModel>> _dataStore = new();
         private readonly object _dataLock = new(); // короткие локации на чтение/запись
 
-        private List<DataBlock> _newDataBlocks = new(); // Временное хранилище для внедрения зависимостей
+        private List<LocalModel> _newDataBlocks = new(); // Временное хранилище для внедрения зависимостей
 
         // Очереди изменений из других потоков
         private readonly ConcurrentQueue<DataAddRequest> _incomingData = new();
         private readonly ConcurrentQueue<DataRemoveRequest> _outgoingRemovals = new();
 
         //Очередь Data, которые нужно обновить
-        private readonly Queue<DataBlock> _dataToUpdate = new();
+        private readonly Queue<LocalModel> _dataToUpdate = new();
 
         // Вызывается из основного потока объекта. В начале каждого апдейта
         internal void PrepareIncomingBlockData()
@@ -50,7 +50,7 @@ namespace NetworkGameEngine
                     item.Data.Initialize(this);
                     if (!_dataStore.TryGetValue(item.Type, out var byKey))
                     {
-                        byKey = new Dictionary<int, DataBlock>();
+                        byKey = new Dictionary<int, LocalModel>();
                         _dataStore[item.Type] = byKey;
                     }
                     // Публикуем заменой ссылки
@@ -106,18 +106,18 @@ namespace NetworkGameEngine
         }
 
         // Generic factory that returns the concrete derived type
-        public T AddData<T>(int key = 0) where T : DataBlock, new()
+        public T AddModel<T>(int key = 0) where T : LocalModel, new()
         {
-            return AddData(key, new T());
+            return AddModel(key, new T());
         }
 
         /// <summary>
         /// Adds a data block instance. If data of this type already exists at key 0 it will be replaced.
         /// Thread-safe.
         /// </summary>
-        public DataBlock AddData(DataBlock data)
+        public LocalModel AddModel(LocalModel data)
         {
-            return AddData<DataBlock>(0, data);
+            return AddModel<LocalModel>(0, data);
         }
 
         /// <summary>
@@ -125,7 +125,7 @@ namespace NetworkGameEngine
         /// Thread-safe.
         /// Returns the same concrete type that was passed in.
         /// </summary>
-        public T AddData<T>(int key, T data) where T : DataBlock
+        public T AddModel<T>(int key, T data) where T : LocalModel
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             _incomingData.Enqueue(new DataAddRequest(data.GetType(), key, data));
@@ -134,7 +134,7 @@ namespace NetworkGameEngine
         /// <summary>
         /// Удаляет данные типа T (ключ 0). Потокобезопасно.
         /// </summary>
-        public void RemoveData<T>() where T : DataBlock
+        public void RemoveModel<T>() where T : LocalModel
         {
             _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), 0, allOfType: false));
         }
@@ -142,7 +142,7 @@ namespace NetworkGameEngine
         /// <summary>
         /// Удаляет данные типа T по ключу. Потокобезопасно.
         /// </summary>
-        public void RemoveData<T>(int key) where T : DataBlock
+        public void RemoveModel<T>(int key) where T : LocalModel
         {
             _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), key, allOfType: false));
         }
@@ -150,7 +150,7 @@ namespace NetworkGameEngine
         /// <summary>
         /// Удаляет все данные типа T. Потокобезопасно.
         /// </summary>
-        public void RemoveAllData<T>() where T : DataBlock
+        public void RemoveAllModel<T>() where T : LocalModel
         {
             _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), key: null, allOfType: true));
         }
@@ -158,24 +158,24 @@ namespace NetworkGameEngine
         /// <summary>
         /// Возвращает данные типа T (ключ 0). Если не поток-владелец — возвращает копию.
         /// </summary>
-        public bool TryGetData<T>(int key, out T result) where T : DataBlock
+        public bool TryGetModel<T>(int key, out T result) where T : LocalModel
         {
-            result = GetData<T>(key);
+            result = GetModel<T>(key);
             return result != null;
         }
 
-        public bool TryGetData<T>(out T result) where T : DataBlock
+        public bool TryGetModel<T>(out T result) where T : LocalModel
         {
-            return TryGetData(0, out result);
+            return TryGetModel(0, out result);
         }
 
         /// <summary>
         /// Возвращает данные типа T по ключу. Если не поток-владелец — возвращает копию.
         /// </summary>
-        public T GetData<T>(int key = 0) where T : DataBlock
+        public T GetModel<T>(int key = 0) where T : LocalModel
         {
             var requestedType = typeof(T);
-            DataBlock value = null;
+            LocalModel value = null;
 
             lock (_dataLock)
             {
@@ -211,7 +211,7 @@ namespace NetworkGameEngine
         /// Возвращает все данные, совместимые с T (включая наследников/интерфейсы).
         /// Для чужих потоков — возвращает копии.
         /// </summary>
-        public List<T> GetAllData<T>() where T : DataBlock
+        public List<T> GetAllModel<T>() where T : LocalModel
         {
             bool isOwner = IsCurrentThreadOwner();
             var result = new List<T>();
@@ -247,7 +247,7 @@ namespace NetworkGameEngine
         /// Ставит в очередь на обоновление данные. Потокобезопасно.
         /// </summary>
         /// <param name="data"></param>
-        internal void EnqueueForUpdate(DataBlock data)
+        internal void EnqueueForUpdate(LocalModel data)
         {
             if (_dataToUpdate.Contains(data)) return;
             _dataToUpdate.Enqueue(data);

@@ -4,9 +4,11 @@ namespace NetworkGameEngine.Sync
 {
     public enum SyncMarkerType
     {
-        Local = 0,
+        //Метка для синхронизации с клиентом
         Client = 1,
+        //Метка для синхронизации с базой данных
         Database = 2,
-        Server = 3,
+        //Метка для дщкальной синхронизации на сервере
+        Local = 3,
     }
 }
