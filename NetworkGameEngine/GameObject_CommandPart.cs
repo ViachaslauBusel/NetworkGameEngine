@@ -74,8 +74,30 @@ namespace NetworkGameEngine
 
     public sealed partial class GameObject
     {
+        private Dictionary<Type, object> m_commandListenerWithResult = new Dictionary<Type, object>();
         private Dictionary<Type, List<object>> m_commandListener = new Dictionary<Type, List<object>>();
         private ConcurrentQueue<CommandContainer> m_commands = new ConcurrentQueue<CommandContainer>();
+        private ConcurrentQueue<CommandContainer> m_commandsWithResult = new ConcurrentQueue<CommandContainer>();
+
+        internal void AddListenerWithResult(Type cmdType, object reactCommand)
+        {
+            if (m_commandListenerWithResult.ContainsKey(cmdType))
+            {
+                m_world.LogError($"GameObject Command listener with result for command {cmdType} is already registered in {reactCommand.GetType()}");
+            }
+            m_commandListenerWithResult[cmdType] = reactCommand;
+        }
+
+        internal void RemoveListenerWithResult(Type cmdType)
+        {
+            m_commandListenerWithResult.Remove(cmdType);
+        }
+
+        private object GetCommandListenerWithResult(Type type)
+        {
+            m_commandListenerWithResult.TryGetValue(type, out var listener);
+            return listener;
+        }
 
         internal void AddListener(Type cmdType, object reactCommand)
         {
@@ -97,11 +119,28 @@ namespace NetworkGameEngine
             return m_commandListener[type];
         }
 
-        internal void CallCommand()
+        internal void DispatchPendingCommands()
         {
             while (m_commands.TryDequeue(out CommandContainer cmd))
             {
                 foreach (var listener in GetCommandListener(cmd.GetCommandType()))
+                {
+                    try
+                    {
+   
+                        cmd.Invoke(listener);
+                    }
+                    catch (Exception ex)
+                    {
+                        m_world.LogError($"GameObject Command processing error in {listener.GetType()}: {ex}");
+                    }
+                }
+            }
+
+            while (m_commandsWithResult.TryDequeue(out CommandContainer cmd))
+            {
+                var listener = GetCommandListenerWithResult(cmd.GetCommandType());
+                if (listener != null)
                 {
                     try
                     {
@@ -124,7 +163,7 @@ namespace NetworkGameEngine
         public async Job<CommandResult<TResult>> SendCommandAndReturnResult<T, TResult>(T command, int waitTime = 0) where T : ICommand
         {
            var commandContainer = new CommandContainerWithResut<T, TResult>(command);
-            m_commands.Enqueue(commandContainer);
+            m_commandsWithResult.Enqueue(commandContainer);
 
             long endWaitTime = Time.Milliseconds + waitTime;
             await Job.WaitUntil(() => commandContainer.IsCompleted

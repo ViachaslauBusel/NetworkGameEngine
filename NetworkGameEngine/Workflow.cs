@@ -112,7 +112,7 @@ namespace NetworkGameEngine
                                     break;
                                 case MethodType.Command:
                                     for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
-                                    { m_objects[executedObjectIndex].CallCommand(); }
+                                    { m_objects[executedObjectIndex].DispatchPendingCommands(); }
                                     break;
                                 case MethodType.JobEcxecutor:
                                     m_jobExcecutor.Update();

@@ -119,10 +119,13 @@ namespace NetworkGameEngine
             {
                 foreach (var @interface in c.GetType().GetInterfaces().Where(x => x.IsGenericType))
                 {
-                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>)
-                        || @interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
+                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>))
                     {
                         AddListener(@interface.GenericTypeArguments[0], c);
+                    }
+                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
+                    {
+                        AddListenerWithResult(@interface.GenericTypeArguments[0], c);
                     }
                 }
 
@@ -284,10 +287,13 @@ namespace NetworkGameEngine
             {
                 foreach (var @interface in c.GetType().GetInterfaces().Where(x => x.IsGenericType))
                 {
-                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>)
-                        || @interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
+                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>))
                     {
                         RemoveListener(@interface.GenericTypeArguments[0], c);
+                    }
+                    if (@interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
+                    {
+                        RemoveListenerWithResult(@interface.GenericTypeArguments[0]);
                     }
                 }
             }
