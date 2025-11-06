@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using NetworkGameEngine.Diagnostics;
 using NetworkGameEngine.Interfaces;
 using NetworkGameEngine.Tools;
 using System.Collections.Concurrent;
@@ -29,12 +30,24 @@ namespace NetworkGameEngine
         private int m_addObjectThIndex = 0;
         private bool m_isWorking = false;
         private Time m_time;
+        private MethodExecutionProfiler _executuinProfiler;
 
         public event Action<string> OnLog;
 
         public Time Time => m_time;
         public int ActiveGameObjectCount => m_objects.Count;
         public int PendingGameObjectAddCount => m_addObjects.Count;
+
+        public MethodExecutionProfiler StartExecutionProfiler(int maxSamples = 1000)
+        {
+            _executuinProfiler = new MethodExecutionProfiler(maxSamples);
+            return _executuinProfiler;
+        }
+
+        public void StopExecutionProfiler()
+        {
+            _executuinProfiler = null;
+        }
 
         public object Resolve(Type type)
         {
@@ -155,26 +168,13 @@ namespace NetworkGameEngine
                 task.Completed(true);
             }
 
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.Prepare); }
-            foreach (var th in m_workflows) { th.Wait(); }
-
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.Init); }
-            foreach (var th in m_workflows) { th.Wait(); }
-
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.Start); }
-            foreach (var th in m_workflows) { th.Wait(); }
-
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.Update); }
-            foreach (var th in m_workflows) { th.Wait(); }
-
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.Command); }
-            foreach (var th in m_workflows) { th.Wait(); }
-
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.JobEcxecutor); }
-            foreach (var th in m_workflows) { th.Wait(); }
-
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.LateUpdate); }
-            foreach (var th in m_workflows) { th.Wait(); }
+            ExecuteMethod(MethodType.Prepare);
+            ExecuteMethod(MethodType.Init);
+            ExecuteMethod(MethodType.Start);
+            ExecuteMethod(MethodType.Update);
+            ExecuteMethod(MethodType.Command);
+            ExecuteMethod(MethodType.JobExecutor);
+            ExecuteMethod(MethodType.LateUpdate);
 
             int removeObjectsCount = m_removeObjects.Count;
             for (int i = 0; i < removeObjectsCount && m_removeObjects.TryDequeue(out var task); i++)
@@ -189,11 +189,9 @@ namespace NetworkGameEngine
                 }
                 task.Completed(isRemoved);
             }
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.OnDestroy); }
-            foreach (var th in m_workflows) { th.Wait(); }
 
-            foreach (var th in m_workflows) { th.CallMethod(MethodType.UpdateData); }
-            foreach (var th in m_workflows) { th.Wait(); }
+            ExecuteMethod(MethodType.OnDestroy);
+            ExecuteMethod(MethodType.UpdateData);
 
             foreach (var obj in m_removedObjects)
             {
@@ -202,19 +200,32 @@ namespace NetworkGameEngine
             }
             m_removedObjects.Clear();
 
+            _executuinProfiler?.StartMethodProfiling(MethodType.OneThreadService);
             foreach (var service in _updatableServices)
             {
                 service.Update();
             }
+            _executuinProfiler?.StopMethodProfiling(MethodType.OneThreadService);
 
+            _executuinProfiler?.StartMethodProfiling(MethodType.MultiThreadService);
             foreach (var service in _threadAwareUpdatableServices)
             {
                 for (int i = 0; i < m_workflows.Length; i++) { m_workflows[i].Execute(() => service.Update(i, m_workflows.Length)); }
                 foreach (var th in m_workflows) { th.Wait(); }
             }
+            _executuinProfiler?.StopMethodProfiling(MethodType.MultiThreadService);
+        }
+
+        private void ExecuteMethod(MethodType method)
+        {
+            _executuinProfiler?.StartMethodProfiling(method);
+            foreach (var th in m_workflows) { th.CallMethod(method); }
+            foreach (var th in m_workflows) { th.Wait(); }
+            _executuinProfiler?.StopMethodProfiling(method);
         }
 
         public bool TryGetGameObject(uint objectID, out GameObject obj) => m_objects.TryGetValue(objectID, out obj);
+
         public GameObject FindGameObject(Predicate<GameObject> match)
         {
             foreach (var obj in m_objects.Values)

@@ -1,12 +1,15 @@
 ﻿using NetworkGameEngine.JobsSystem;
+using System.Diagnostics;
 
 namespace NetworkGameEngine
 {
     public enum MethodType { None = 0, Init, Start, Update, LateUpdate, OnDestroy, UpdateData,
         Command,
         Prepare,
-        JobEcxecutor,
-        ActionExecuter
+        JobExecutor,
+        ActionExecuter,
+        OneThreadService,
+        MultiThreadService
     }
     public class Workflow
     {
@@ -114,7 +117,7 @@ namespace NetworkGameEngine
                                     for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
                                     { m_objects[executedObjectIndex].DispatchPendingCommands(); }
                                     break;
-                                case MethodType.JobEcxecutor:
+                                case MethodType.JobExecutor:
                                     m_jobExcecutor.Update();
                                     break;
                                 case MethodType.LateUpdate:
