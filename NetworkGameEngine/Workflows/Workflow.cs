@@ -1,5 +1,4 @@
 ﻿using NetworkGameEngine.JobsSystem;
-using System.Diagnostics;
 
 namespace NetworkGameEngine
 {
@@ -11,7 +10,7 @@ namespace NetworkGameEngine
         OneThreadService,
         MultiThreadService
     }
-    public class Workflow
+    internal class Workflow
     {
         private World m_world;
         private Thread m_thread;
@@ -20,9 +19,11 @@ namespace NetworkGameEngine
         private Action _action;
         private volatile MethodType m_currentMethod = MethodType.None;
         private ThreadJobExecutor m_jobExcecutor;
+        // Текущий GameObject, обрабатываемый в этом потоке
+        private GameObject m_currentObject;
 
+        public GameObject CurrentGameObject => m_currentObject;
         public bool IsFree => m_currentMethod == MethodType.None;
-
         public int ThreadID { get; private set; }
 
         public void Init(World world)
@@ -39,7 +40,7 @@ namespace NetworkGameEngine
             System.Threading.SynchronizationContext.SetSynchronizationContext(
                 new NetworkGameEngine.JobsSystem.EngineSynchronizationContext(m_world));
 
-            m_jobExcecutor = JobsManager.RegisterThreadHandler(m_world);
+            m_jobExcecutor = JobsManager.RegisterThreadHandler(m_world, this);
         }
 
         internal void AddObject(GameObject obj)
@@ -98,39 +99,63 @@ namespace NetworkGameEngine
                             switch (m_currentMethod)
                             {
                                 case MethodType.Prepare:
-                                    for(; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
-                                    { m_objects[executedObjectIndex].CallPrepare(); }
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.CallPrepare();
+                                    }
                                     break;
                                 case MethodType.Init:
                                     for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
-                                    { m_objects[executedObjectIndex].CallInit(); }
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.CallInit();
+                                    }
                                     break;
                                 case MethodType.Start:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
-                                    { m_objects[executedObjectIndex].CallStart(); }
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.CallStart();
+                                    }
                                     break;
                                 case MethodType.Update:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
-                                    { m_objects[executedObjectIndex].CallUpdate(); }
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.CallUpdate();
+                                    }
                                     break;
                                 case MethodType.Command:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
-                                    { m_objects[executedObjectIndex].DispatchPendingCommands(); }
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.DispatchPendingCommands();
+                                    }
                                     break;
                                 case MethodType.JobExecutor:
                                     m_jobExcecutor.Update();
                                     break;
                                 case MethodType.LateUpdate:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++) 
-                                    { m_objects[executedObjectIndex].CallLateUpdate(); }
+                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.CallLateUpdate();
+                                    }
                                     break;
                                 case MethodType.OnDestroy:
                                     for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
-                                    { m_objects[executedObjectIndex].CallOnDestroy(); }
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.CallOnDestroy();
+                                    }
                                     break;
                                 case MethodType.UpdateData:
                                     for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
-                                    { m_objects[executedObjectIndex].CallUpdateData(); }
+                                    {
+                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject.CallUpdateData();
+                                    }
                                     break;
                                 case MethodType.ActionExecuter:
                                     try
@@ -145,6 +170,7 @@ namespace NetworkGameEngine
                                 default:
                                     throw new Exception("invalid object processing state");
                             }
+                            m_currentObject = null;
                         }
                         catch (Exception e)
                         {
@@ -159,6 +185,9 @@ namespace NetworkGameEngine
             }
         }
 
-      
+        internal void SetCurrentGameObject(GameObject owner)
+        {
+            m_currentObject = owner;
+        }
     }
 }

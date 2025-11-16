@@ -1,68 +1,158 @@
-﻿namespace NetworkGameEngine.Signals
+﻿using NetworkGameEngine.Signals.Commands;
+using NetworkGameEngine.Workflows;
+using System.Runtime.CompilerServices;
+
+namespace NetworkGameEngine.Signals
 {
-    namespace NetworkGameEngine.Signals
+    public abstract class PriorityEventBase<THandler> where THandler : Delegate
     {
-        public abstract class PriorityEventBase<THandler> where THandler : Delegate
+        public readonly struct SubscriptionEntry
         {
-            private readonly SortedList<int, List<THandler>> _handlers
-                = new SortedList<int, List<THandler>>(new AscComparer());
+            public readonly THandler Handler;
+            public readonly GameObject Owner;
 
-            public void Subscribe(THandler handler, int order = 0)
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public SubscriptionEntry(THandler handler, GameObject owner)
             {
-                if (!_handlers.TryGetValue(order, out var list))
+                Handler = handler;
+                Owner = owner;
+            }
+        }
+
+        private readonly object m_lock = new object();
+        private readonly GameObject m_ownerGameObject;
+        private readonly SortedList<int, List<SubscriptionEntry>> m_subscriptionsByPriority =
+            new SortedList<int, List<SubscriptionEntry>>(Comparer<int>.Default);
+        private List<SubscriptionEntry> m_snapshot = new List<SubscriptionEntry>(15);
+        private bool m_isDirty = false;
+
+
+        protected GameObject OwnerObject => m_ownerGameObject;
+
+        protected PriorityEventBase()
+        {
+            m_ownerGameObject = GlobalWorkflowRegistry.GetCurrentWorkflow()?.CurrentGameObject;
+        }
+
+        // ----------------------------------------------------------------------
+        // Subscribe / Unsubscribe
+        // ----------------------------------------------------------------------
+
+        public void Subscribe(THandler handler, int order = 0)
+        {
+            var currentObj = GlobalWorkflowRegistry.GetCurrentWorkflow()?.CurrentGameObject;
+
+            lock (m_lock)
+            {
+                if (!m_subscriptionsByPriority.TryGetValue(order, out var list))
                 {
-                    list = new List<THandler>();
-                    _handlers.Add(order, list);
+                    list = new List<SubscriptionEntry>(10);
+                    m_subscriptionsByPriority.Add(order, list);
                 }
-                list.Add(handler);
-            }
 
-            public void Unsubscribe(THandler handler)
-            {
-                foreach (var list in _handlers.Values)
-                    list.Remove(handler);
+                list.Add(new SubscriptionEntry(handler, currentObj));
+                m_isDirty = true;
             }
+        }
 
-            protected IEnumerable<THandler> EnumerateHandlers()
+        public void Unsubscribe(THandler handler)
+        {
+            lock (m_lock)
             {
-                foreach (var kvp in _handlers)
+                foreach (var list in m_subscriptionsByPriority.Values)
                 {
-                    foreach (var handler in kvp.Value)
-                        yield return handler;
+                    for (int i = list.Count - 1; i >= 0; i--)
+                    {
+                        if (list[i].Handler.Equals(handler))
+                            list.RemoveAt(i);
+                    }
                 }
-            }
-
-            private class AscComparer : IComparer<int>
-            {
-                public int Compare(int x, int y) => x.CompareTo(y);
+                m_isDirty = true;
             }
         }
 
-        public class PriorityEvent : PriorityEventBase<Action>
+        // ----------------------------------------------------------------------
+        // Snapshot enumeration
+        // ----------------------------------------------------------------------
+
+        protected List<SubscriptionEntry> CreateSnapshot()
         {
-            public void Invoke()
+            lock (m_lock)
             {
-                foreach (var handler in EnumerateHandlers())
-                    handler();
+                if (!m_isDirty)
+                    return m_snapshot;
+                int total = 0;
+                foreach (var kv in m_subscriptionsByPriority)
+                    total += kv.Value.Count;
+
+                m_snapshot.Clear();
+
+                foreach (var kv in m_subscriptionsByPriority)
+                    m_snapshot.AddRange(kv.Value);
+
+                return m_snapshot;
             }
         }
 
-        public class PriorityEvent<T0> : PriorityEventBase<Action<T0>> where T0 : allows ref struct
+        // ----------------------------------------------------------------------
+        // Invocation routing
+        // ----------------------------------------------------------------------
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void InternalInvoke(in SubscriptionEntry entry, Action call)
         {
-            public void Invoke(T0 arg0)
+            if (entry.Owner != null && entry.Owner != m_ownerGameObject)
             {
-                foreach (var handler in EnumerateHandlers())
-                    handler(arg0);
+                entry.Owner.SendCommand(new ExecuteActionCommand(call));
+            }
+            else
+            {
+                call?.Invoke();
             }
         }
+    }
 
-        public class PriorityEvent<T0, T1> : PriorityEventBase<Action<T0, T1>> where T0 : allows ref struct
+    // ==========================================================================
+    // EVENTS
+    // ==========================================================================
+
+    public sealed class PriorityEvent : PriorityEventBase<Action>
+    {
+        public void Invoke()
         {
-            public void Invoke(T0 arg0, T1 arg1)
-            {
-                foreach (var handler in EnumerateHandlers())
-                    handler(arg0, arg1);
-            }
+            var snapshot = CreateSnapshot();
+            foreach (var entry in snapshot)
+                InternalInvoke(entry, entry.Handler);
+        }
+    }
+
+    public sealed class PriorityEvent<T0> : PriorityEventBase<Action<T0>>
+    {
+        public void Invoke(T0 a0)
+        {
+            var snapshot = CreateSnapshot();
+            foreach (var entry in snapshot)
+                InternalInvoke(entry, () => entry.Handler(a0));
+        }
+    }
+
+    public sealed class PriorityEvent<T0, T1> : PriorityEventBase<Action<T0, T1>>
+    {
+        public void Invoke(T0 a0, T1 a1)
+        {
+            var snapshot = CreateSnapshot();
+            foreach (var entry in snapshot)
+                InternalInvoke(entry, () => entry.Handler(a0, a1));
+        }
+    }
+
+    public sealed class PriorityEvent<T0, T1, T2> : PriorityEventBase<Action<T0, T1, T2>>
+    {
+        public void Invoke(T0 a0, T1 a1, T2 a2)
+        {
+            var snapshot = CreateSnapshot();
+            foreach (var entry in snapshot)
+                InternalInvoke(entry, () => entry.Handler(a0, a1, a2));
         }
     }
 }

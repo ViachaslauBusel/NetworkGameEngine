@@ -2,6 +2,7 @@
 using NetworkGameEngine.Diagnostics;
 using NetworkGameEngine.Interfaces;
 using NetworkGameEngine.Tools;
+using NetworkGameEngine.Workflows;
 using System.Collections.Concurrent;
 
 namespace NetworkGameEngine
@@ -15,7 +16,6 @@ namespace NetworkGameEngine
     {
         public uint GameObjectID { get; set; }
     }
-    public enum ServiceScope { Singleton, Transient, Cached }
     public class World
     {
         private List<IContainer> m_containers;
@@ -26,7 +26,7 @@ namespace NetworkGameEngine
         private List<IUpdatableService> _updatableServices = new List<IUpdatableService>();
         private List<IThreadAwareUpdatableService> _threadAwareUpdatableServices = new List<IThreadAwareUpdatableService>();
         private uint m_generatorID = 1;
-        private Workflow[] m_workflows;
+        private WorkflowPool m_workflows;
         private int m_addObjectThIndex = 0;
         private bool m_isWorking = false;
         private Time m_time;
@@ -37,6 +37,7 @@ namespace NetworkGameEngine
         public Time Time => m_time;
         public int ActiveGameObjectCount => m_objects.Count;
         public int PendingGameObjectAddCount => m_addObjects.Count;
+        internal WorkflowPool Workflows => m_workflows;
 
         public MethodExecutionProfiler StartExecutionProfiler(int maxSamples = 1000)
         {
@@ -82,7 +83,7 @@ namespace NetworkGameEngine
         public void Init(int maxThread, int frameInterval, IContainer container = null)
         {
             m_time = new Time(frameInterval);
-            m_workflows = new Workflow[maxThread];
+            m_workflows = new WorkflowPool(this);
             m_containers = new List<IContainer>();
 
             if(container != null)
@@ -90,13 +91,11 @@ namespace NetworkGameEngine
 
             var builder = new ContainerBuilder();
             builder.RegisterInstance(m_time).AsSelf().SingleInstance();
+            builder.RegisterInstance(this).AsSelf().SingleInstance();
             m_containers.Add(builder.Build());
 
-            for (int i = 0; i < m_workflows.Length; i++)
-            {
-                m_workflows[i] = new Workflow();
-                m_workflows[i].Init(this);
-            }
+            m_workflows.Init(maxThread);
+
 
             _updatableServices.AddRange(Resolve<IUpdatableService[]>());
             _threadAwareUpdatableServices.AddRange(Resolve<IThreadAwareUpdatableService[]>());
@@ -157,12 +156,12 @@ namespace NetworkGameEngine
             for (int i = 0; i < addObjectsCount && m_addObjects.TryDequeue(out var task); i++)
             {
                 GameObject obj = task.GameObject;
-                obj.Init(m_generatorID++, m_workflows[m_addObjectThIndex].ThreadID, this);
+                obj.Init(m_generatorID++, m_workflows.GetWorkflowByIndex(m_addObjectThIndex).ThreadID, this);
 
                 m_objects.TryAdd(obj.ID, obj);
 
-                m_workflows[m_addObjectThIndex].AddObject(obj);
-                m_addObjectThIndex = (m_addObjectThIndex + 1) % m_workflows.Length;
+                m_workflows.GetWorkflowByIndex(m_addObjectThIndex).AddObject(obj);
+                m_addObjectThIndex = (m_addObjectThIndex + 1) % m_workflows.Count;
 
                 task.GameObjectID = obj.ID;
                 task.Completed(true);
@@ -179,15 +178,15 @@ namespace NetworkGameEngine
             int removeObjectsCount = m_removeObjects.Count;
             for (int i = 0; i < removeObjectsCount && m_removeObjects.TryDequeue(out var task); i++)
             {
-                bool isRemoved = m_objects.ContainsKey(task.GameObjectID);
-                if (isRemoved)
+                bool isObjectFound = m_objects.ContainsKey(task.GameObjectID);
+                if (isObjectFound)
                 {
                     GameObject removeObj = m_objects[task.GameObjectID];
                     m_removedObjects.Add(removeObj);
 
                     removeObj.Destroy();
                 }
-                task.Completed(isRemoved);
+                task.Completed(isObjectFound);
             }
 
             ExecuteMethod(MethodType.OnDestroy);
@@ -196,7 +195,7 @@ namespace NetworkGameEngine
             foreach (var obj in m_removedObjects)
             {
                 m_objects.TryRemove(obj.ID, out _);
-                m_workflows.First(th => th.ThreadID == obj.ThreadID).RemoveObject(obj);
+                m_workflows.GetWorkflowByThreadID(obj.ThreadID).RemoveObject(obj);
             }
             m_removedObjects.Clear();
 
@@ -210,8 +209,8 @@ namespace NetworkGameEngine
             _executuinProfiler?.StartMethodProfiling(MethodType.MultiThreadService);
             foreach (var service in _threadAwareUpdatableServices)
             {
-                for (int i = 0; i < m_workflows.Length; i++) { m_workflows[i].Execute(() => service.Update(i, m_workflows.Length)); }
-                foreach (var th in m_workflows) { th.Wait(); }
+                for (int i = 0; i < m_workflows.Count; i++) { m_workflows.GetWorkflowByIndex(i).Execute(() => service.Update(i, m_workflows.Count)); }
+                foreach (var th in m_workflows.AllWorkflows) { th.Wait(); }
             }
             _executuinProfiler?.StopMethodProfiling(MethodType.MultiThreadService);
         }
@@ -219,8 +218,8 @@ namespace NetworkGameEngine
         private void ExecuteMethod(MethodType method)
         {
             _executuinProfiler?.StartMethodProfiling(method);
-            foreach (var th in m_workflows) { th.CallMethod(method); }
-            foreach (var th in m_workflows) { th.Wait(); }
+            foreach (var th in m_workflows.AllWorkflows) { th.CallMethod(method); }
+            foreach (var th in m_workflows.AllWorkflows) { th.Wait(); }
             _executuinProfiler?.StopMethodProfiling(method);
         }
 

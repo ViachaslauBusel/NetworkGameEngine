@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using NetworkGameEngine.DependencyInjection;
 using NetworkGameEngine.JobsSystem;
+using NetworkGameEngine.Signals.Components;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
@@ -21,7 +22,7 @@ namespace NetworkGameEngine
         private LinkedList<Component> m_lateUpdateComponents = new LinkedList<Component>();
         private List<Component> m_newComponents = new List<Component>();
         private List<Component> m_removeComponents = new List<Component>();
-        Dictionary<Type, List<MethodInfo>> m_injectMethodsCache = new Dictionary<Type, List<MethodInfo>>();
+        private Dictionary<Type, List<MethodInfo>> m_injectMethodsCache = new Dictionary<Type, List<MethodInfo>>();
 
         public string Name => m_name;
         public uint ID { get; private set; }
@@ -37,6 +38,7 @@ namespace NetworkGameEngine
         public GameObject()
         {
             m_name = "GameObject";
+            AddComponent<EventHandlerComponent>();
         }
 
         public void SetActive(bool value)
@@ -50,7 +52,7 @@ namespace NetworkGameEngine
 
         public bool IsCurrentThreadOwner()
         {
-            return m_threadID == Thread.CurrentThread.ManagedThreadId;
+            return m_threadID == Thread.CurrentThread.ManagedThreadId && this == m_world.Workflows.GetCurrentWorkflow().CurrentGameObject;
         }
 
         public async Job<bool> AddComponentAsync(Component component)//ref 
