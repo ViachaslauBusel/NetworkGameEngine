@@ -74,9 +74,11 @@ namespace NetworkGameEngine
             m_state = ComponentState.Error;
         }
         public virtual void Init() { }
+        public virtual void OnEnable() { }
         public virtual void Start() { }
         public virtual void Update() { }
         public virtual void LateUpdate() { }
+        public virtual void OnDisable() { }
         public virtual void OnDestroy() { }
 
         public T GetComponent<T>() where T : class
