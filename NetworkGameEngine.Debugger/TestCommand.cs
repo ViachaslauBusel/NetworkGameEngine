@@ -1,10 +1,4 @@
 ﻿using NetworkGameEngine.UnitTests;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Test;
 
 namespace NetworkGameEngine.Debugger
 {
@@ -16,7 +10,7 @@ namespace NetworkGameEngine.Debugger
     {
         public string testValue = "Hello World_1!!!";
     }
-    public struct TestData_0 : IData
+    public struct TestData_0 
     {
         public int OutValue;
     }

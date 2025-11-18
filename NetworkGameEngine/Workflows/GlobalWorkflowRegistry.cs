@@ -13,7 +13,7 @@
             m_workflows[workflow.ThreadID] = workflow;
         }
 
-        internal static Workflow GetWorkflow(int threadID)
+        internal static Workflow GetWorkflowByThreadId(int threadID)
         {
             m_workflows.TryGetValue(threadID, out var workflow);
             return workflow;
@@ -27,7 +27,7 @@
         internal static Workflow GetCurrentWorkflow()
         {
             var threadID = Thread.CurrentThread.ManagedThreadId;
-            return GetWorkflow(threadID);
+            return GetWorkflowByThreadId(threadID);
         }
     }
 }

@@ -33,7 +33,7 @@
             return m_workflowArray[index];
         }
 
-        internal Workflow GetWorkflowByThreadID(int threadID) => GlobalWorkflowRegistry.GetWorkflow(threadID);
+        internal Workflow GetWorkflowByThreadId(int threadID) => GlobalWorkflowRegistry.GetWorkflowByThreadId(threadID);
 
         internal Workflow GetCurrentWorkflow() => GlobalWorkflowRegistry.GetCurrentWorkflow();
     }

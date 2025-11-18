@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using NetworkGameEngine.Workflows;
+using System.Collections.Concurrent;
 
 namespace NetworkGameEngine
 {
@@ -39,8 +40,10 @@ namespace NetworkGameEngine
         //Очередь Data, которые нужно обновить
         private readonly Queue<LocalModel> _dataToUpdate = new();
 
+        public bool HasIncomingModels => !_incomingData.IsEmpty;
+
         // Вызывается из основного потока объекта. В начале каждого апдейта
-        internal void PrepareIncomingBlockData()
+        internal void PrepareIncomingModels()
         {
             // Применяем добавления/замены данных
             while (_incomingData.TryDequeue(out var item))
@@ -60,9 +63,18 @@ namespace NetworkGameEngine
                     _newDataBlocks.Add(item.Data);
                 }
             }
+
+            lock (_incomingData)
+            {
+                if (_incomingData.Count == 0)
+                {
+                    m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.PrepareModel);
+                }
+                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnAttachModel);
+            }
         }
 
-        internal void CallOnEnableForAllData()
+        internal void CallOnAttachModels()
         {
             lock (_dataLock)
             {
@@ -71,11 +83,12 @@ namespace NetworkGameEngine
                     data.OnAttached();
                 }
                 _newDataBlocks.Clear();
+                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.OnAttachModel);
             }
         }
 
         // Вызывается из основного потока объекта. В конце каждого апдейта
-        internal void PrepareOutgoingBlockData()
+        internal void CallOnDetachModels()
         {
             // Применяем удаления данных
             while (_outgoingRemovals.TryDequeue(out var req))
@@ -103,6 +116,14 @@ namespace NetworkGameEngine
                     }
                 }
             }
+
+            lock (_outgoingRemovals)
+            {
+                if (_outgoingRemovals.Count == 0)
+                {
+                    m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.OnDetachModel);
+                }
+            }
         }
 
         // Generic factory that returns the concrete derived type
@@ -128,7 +149,11 @@ namespace NetworkGameEngine
         public T AddModel<T>(int key, T data) where T : LocalModel
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
-            _incomingData.Enqueue(new DataAddRequest(data.GetType(), key, data));
+            lock (_incomingData)
+            {
+                _incomingData.Enqueue(new DataAddRequest(data.GetType(), key, data));
+                m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.PrepareModel);
+            }
             return data;
         }
         /// <summary>
@@ -136,7 +161,11 @@ namespace NetworkGameEngine
         /// </summary>
         public void RemoveModel<T>() where T : LocalModel
         {
-            _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), 0, allOfType: false));
+            lock (_outgoingRemovals)
+            {
+                _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), 0, allOfType: false));
+                m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDetachModel);
+            }
         }
 
         /// <summary>
@@ -144,7 +173,11 @@ namespace NetworkGameEngine
         /// </summary>
         public void RemoveModel<T>(int key) where T : LocalModel
         {
-            _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), key, allOfType: false));
+            lock (_outgoingRemovals)
+            {
+                _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), key, allOfType: false));
+                m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDetachModel);
+            }
         }
 
         /// <summary>
@@ -152,7 +185,11 @@ namespace NetworkGameEngine
         /// </summary>
         public void RemoveAllModel<T>() where T : LocalModel
         {
-            _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), key: null, allOfType: true));
+            lock (_outgoingRemovals)
+            {
+                _outgoingRemovals.Enqueue(new DataRemoveRequest(typeof(T), key: null, allOfType: true));
+                m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDetachModel);
+            }
         }
 
         /// <summary>
@@ -234,13 +271,14 @@ namespace NetworkGameEngine
         }
 
         //Вызывается каждый кадр в потоке объекта
-        internal void CallUpdateData()
+        internal void CallUpdateModels()
         {
             foreach (var data in _dataToUpdate)
             {
                 data.UpdateData();
             }
             _dataToUpdate.Clear();
+            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.UpdateModels);
         }
 
         /// <summary>
@@ -251,6 +289,7 @@ namespace NetworkGameEngine
         {
             if (_dataToUpdate.Contains(data)) return;
             _dataToUpdate.Enqueue(data);
+            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.UpdateModels);
         }
     }
 }

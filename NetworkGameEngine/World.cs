@@ -152,7 +152,7 @@ namespace NetworkGameEngine
 
         internal void Update()
         {
-            int addObjectsCount = Math.Min(100, m_addObjects.Count);
+            int addObjectsCount = Math.Min(400, m_addObjects.Count);
             for (int i = 0; i < addObjectsCount && m_addObjects.TryDequeue(out var task); i++)
             {
                 GameObject obj = task.GameObject;
@@ -167,13 +167,16 @@ namespace NetworkGameEngine
                 task.Completed(true);
             }
 
-            ExecuteMethod(MethodType.Prepare);
-            ExecuteMethod(MethodType.Init);
-            ExecuteMethod(MethodType.Start);
-            ExecuteMethod(MethodType.Update);
-            ExecuteMethod(MethodType.Command);
+            ExecuteMethod(MethodType.PrepareComponent);
+            ExecuteMethod(MethodType.PrepareModel);
+            ExecuteMethod(MethodType.InitComponent);
+            ExecuteMethod(MethodType.OnAttachModel);
+            ExecuteMethod(MethodType.OnEnableComponent);
+            ExecuteMethod(MethodType.StartComponent);
+            ExecuteMethod(MethodType.UpdateComponent);
+            ExecuteMethod(MethodType.DispatchCommands);
             ExecuteMethod(MethodType.JobExecutor);
-            ExecuteMethod(MethodType.LateUpdate);
+            ExecuteMethod(MethodType.LateUpdateComponent);
 
             int removeObjectsCount = m_removeObjects.Count;
             for (int i = 0; i < removeObjectsCount && m_removeObjects.TryDequeue(out var task); i++)
@@ -189,13 +192,15 @@ namespace NetworkGameEngine
                 task.Completed(isObjectFound);
             }
 
-            ExecuteMethod(MethodType.OnDestroy);
-            ExecuteMethod(MethodType.UpdateData);
+            ExecuteMethod(MethodType.OnDetachModel);
+            ExecuteMethod(MethodType.OnDisableComponent);
+            ExecuteMethod(MethodType.OnDestroyComponent);
+            ExecuteMethod(MethodType.UpdateModels);
 
             foreach (var obj in m_removedObjects)
             {
                 m_objects.TryRemove(obj.ID, out _);
-                m_workflows.GetWorkflowByThreadID(obj.ThreadID).RemoveObject(obj);
+                m_workflows.GetWorkflowByThreadId(obj.ThreadID).RemoveObject(obj);
             }
             m_removedObjects.Clear();
 

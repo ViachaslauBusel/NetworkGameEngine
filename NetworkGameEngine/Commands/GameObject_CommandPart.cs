@@ -78,8 +78,40 @@ namespace NetworkGameEngine
         private Dictionary<Type, List<object>> m_commandListener = new Dictionary<Type, List<object>>();
         private ConcurrentQueue<CommandContainer> m_commands = new ConcurrentQueue<CommandContainer>();
         private ConcurrentQueue<CommandContainer> m_commandsWithResult = new ConcurrentQueue<CommandContainer>();
+        private object m_cmdLockObject = new object();
 
-        internal void AddListenerWithResult(Type cmdType, object reactCommand)
+
+        private void RegisterCommandListenersForComponent(Component c)
+        {
+            foreach (var @interface in c.GetType().GetInterfaces().Where(x => x.IsGenericType))
+            {
+                if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>))
+                {
+                    AddListener(@interface.GenericTypeArguments[0], c);
+                }
+                if (@interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
+                {
+                    AddListenerWithResult(@interface.GenericTypeArguments[0], c);
+                }
+            }
+        }
+
+        private void UnregisterCommandListenersForComponent(Component c)
+        {
+            foreach (var @interface in c.GetType().GetInterfaces().Where(x => x.IsGenericType))
+            {
+                if (@interface.GetGenericTypeDefinition() == typeof(IReactCommand<>))
+                {
+                    RemoveListener(@interface.GenericTypeArguments[0], c);
+                }
+                if (@interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
+                {
+                    RemoveListenerWithResult(@interface.GenericTypeArguments[0]);
+                }
+            }
+        }
+
+        private void AddListenerWithResult(Type cmdType, object reactCommand)
         {
             if (m_commandListenerWithResult.ContainsKey(cmdType))
             {
@@ -88,7 +120,7 @@ namespace NetworkGameEngine
             m_commandListenerWithResult[cmdType] = reactCommand;
         }
 
-        internal void RemoveListenerWithResult(Type cmdType)
+        private void RemoveListenerWithResult(Type cmdType)
         {
             m_commandListenerWithResult.Remove(cmdType);
         }
@@ -152,18 +184,35 @@ namespace NetworkGameEngine
                     }
                 }
             }
+
+            lock (m_cmdLockObject)
+            {
+                if (m_commands.IsEmpty && m_commandsWithResult.IsEmpty)
+                {
+                    m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.DispatchCommands);
+                }
+            }
         }
 
         //PUBLIC part >>>
         public void SendCommand<T>(T command) where T : ICommand 
         {
             m_commands.Enqueue(new CommandContainer<T>(command));
+            lock (m_cmdLockObject)
+            {
+                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.DispatchCommands);
+            }
         }
 
         public async Job<CommandResult<TResult>> SendCommandAndReturnResult<T, TResult>(T command, int waitTime = 0) where T : ICommand
         {
            var commandContainer = new CommandContainerWithResut<T, TResult>(command);
             m_commandsWithResult.Enqueue(commandContainer);
+
+            lock (m_cmdLockObject)
+            {
+                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.DispatchCommands);
+            }
 
             long endWaitTime = Time.Milliseconds + waitTime;
             await Job.WaitUntil(() => commandContainer.IsCompleted

@@ -26,18 +26,51 @@ namespace NetworkGameEngine
         }
 
         private GameObject m_gameObject;
+        private bool m_isStarted = false, m_isEnabled = false;
+        private bool m_enabled = true;
         private volatile ComponentState m_state = ComponentState.None;
 
         public GameObject GameObject => m_gameObject;
         internal ComponentState State => m_state;
-        public bool enabled = true;
+        internal bool IsStarted => m_isStarted;
+        internal bool IsEnabled => m_isEnabled;
 
-
+        public bool Enabled
+        {
+            get => m_enabled;
+            set
+            {
+                m_enabled = value;
+                if (m_enabled)
+                {
+                    m_gameObject.World.Workflows.GetWorkflowByThreadId(m_gameObject.ThreadID)
+                        .CallRegistry.Register(m_gameObject, MethodType.OnEnableComponent);
+                }
+                else
+                {
+                    m_gameObject.World.Workflows.GetWorkflowByThreadId(m_gameObject.ThreadID)
+                        .CallRegistry.Register(m_gameObject, MethodType.OnDisableComponent);
+                }
+            }
+        }
 
         private static readonly ConcurrentDictionary<Type, OverrideInfo> s_overrideCache = new();
 
         internal bool HasUpdateOverride => GetOverrideInfo(GetType()).Update;
         internal bool HasLateUpdateOverride => GetOverrideInfo(GetType()).LateUpdate;
+
+        public void SetStarted()
+        {
+            m_isStarted = true;
+        }
+        public void SetEnabled()
+        {
+            m_isEnabled = true;
+        }
+        public void SetDisabled()
+        {
+            m_isEnabled = false;
+        }
 
         private static OverrideInfo GetOverrideInfo(Type type)
         {

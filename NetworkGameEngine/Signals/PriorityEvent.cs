@@ -2,7 +2,7 @@
 using NetworkGameEngine.Workflows;
 using System.Runtime.CompilerServices;
 
-namespace NetworkGameEngine.Signals
+namespace NetworkGameEngine
 {
     public abstract class PriorityEventBase<THandler> where THandler : Delegate
     {

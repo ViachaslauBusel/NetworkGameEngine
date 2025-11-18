@@ -1,7 +1,4 @@
-﻿using NetworkGameEngine.Signals;
-using NetworkGameEngine.Signals.NetworkGameEngine.Signals;
-
-namespace NetworkGameEngine.UnitTests
+﻿namespace NetworkGameEngine.UnitTests
 {
     public class PriorityEventTest
     {

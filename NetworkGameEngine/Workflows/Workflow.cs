@@ -2,9 +2,21 @@
 
 namespace NetworkGameEngine
 {
-    public enum MethodType { None = 0, Init, Start, Update, LateUpdate, OnDestroy, UpdateData,
-        Command,
-        Prepare,
+    public enum MethodType { 
+        None = 0,
+        PrepareComponent,
+        PrepareModel,
+        InitComponent, 
+        OnAttachModel,
+        OnEnableComponent, 
+        StartComponent,
+        UpdateComponent,
+        LateUpdateComponent,
+        OnDetachModel,
+        OnDisableComponent, 
+        OnDestroyComponent,
+        UpdateModels,
+        DispatchCommands,
         JobExecutor,
         ActionExecuter,
         OneThreadService,
@@ -14,8 +26,10 @@ namespace NetworkGameEngine
     {
         private World m_world;
         private Thread m_thread;
+        private int m_threadId;
         private Object m_locker = new object();
         private List<GameObject> m_objects = new List<GameObject>();
+        private GameObjectCallRegistry _callRegistry = new GameObjectCallRegistry();
         private Action _action;
         private volatile MethodType m_currentMethod = MethodType.None;
         private ThreadJobExecutor m_jobExcecutor;
@@ -24,14 +38,15 @@ namespace NetworkGameEngine
 
         public GameObject CurrentGameObject => m_currentObject;
         public bool IsFree => m_currentMethod == MethodType.None;
-        public int ThreadID { get; private set; }
+        public int ThreadID => m_threadId;
+        internal GameObjectCallRegistry CallRegistry => _callRegistry;
 
         public void Init(World world)
         {
             m_world = world;
             m_thread = new Thread(ThreadLoop);
             m_thread.Start();
-            ThreadID = m_thread.ManagedThreadId;
+            m_threadId = m_thread.ManagedThreadId;
         }
 
         private void InitThread()
@@ -46,6 +61,10 @@ namespace NetworkGameEngine
         internal void AddObject(GameObject obj)
         {
             m_objects.Add(obj);
+            if (obj.HasIncomingComponents)
+                _callRegistry.Register(obj, MethodType.PrepareComponent);
+            if (obj.HasIncomingModels)
+                _callRegistry.Register(obj, MethodType.PrepareModel);
         }
 
         internal void CallMethod(MethodType method)
@@ -91,70 +110,105 @@ namespace NetworkGameEngine
                 {
                     Monitor.Wait(m_locker);
 
-                    int executedObjectIndex = 0;
                     while (m_currentMethod != MethodType.None)
                     {
                         try
                         {
                             switch (m_currentMethod)
                             {
-                                case MethodType.Prepare:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                case MethodType.PrepareComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.PrepareComponent))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
-                                        m_currentObject.CallPrepare();
+                                        m_currentObject = obj;
+                                        m_currentObject.PrepareIncomingComponents();
                                     }
                                     break;
-                                case MethodType.Init:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    case MethodType.PrepareModel:
+                                        foreach (var obj in _callRegistry.GetTargetsFor(MethodType.PrepareModel))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
-                                        m_currentObject.CallInit();
+                                        m_currentObject = obj;
+                                        m_currentObject.PrepareIncomingModels();
+                                    }
+                                        break;
+                                case MethodType.InitComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.InitComponent))
+                                    {
+                                        m_currentObject = obj;
+                                        m_currentObject.CallInitComponents();
                                     }
                                     break;
-                                case MethodType.Start:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                    case MethodType.OnAttachModel:
+                                        foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnAttachModel))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
-                                        m_currentObject.CallStart();
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnAttachModels();  
+                                    }
+                                        break;
+                                case MethodType.OnEnableComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnEnableComponent))
+                                    {
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnEnableComponents();
                                     }
                                     break;
-                                case MethodType.Update:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                case MethodType.StartComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.StartComponent))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
-                                        m_currentObject.CallUpdate();
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnStartComponents();
                                     }
                                     break;
-                                case MethodType.Command:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                case MethodType.UpdateComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.UpdateComponent))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnUpdateComponents();
+                                    }
+                                    break;
+                                case MethodType.DispatchCommands:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.DispatchCommands))
+                                    {
+                                        m_currentObject = obj;
                                         m_currentObject.DispatchPendingCommands();
                                     }
                                     break;
                                 case MethodType.JobExecutor:
                                     m_jobExcecutor.Update();
                                     break;
-                                case MethodType.LateUpdate:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                case MethodType.LateUpdateComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.LateUpdateComponent))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
-                                        m_currentObject.CallLateUpdate();
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnLateUpdateComponents();
                                     }
                                     break;
-                                case MethodType.OnDestroy:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+            
+                                case MethodType.OnDisableComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnDisableComponent))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
-                                        m_currentObject.CallOnDestroy();
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnDisableComponents();
                                     }
                                     break;
-                                case MethodType.UpdateData:
-                                    for (; executedObjectIndex < m_objects.Count; executedObjectIndex++)
+                                case MethodType.OnDetachModel:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnDetachModel))
                                     {
-                                        m_currentObject = m_objects[executedObjectIndex];
-                                        m_currentObject.CallUpdateData();
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnDetachModels(); 
+                                    }
+                                    break;
+                                case MethodType.OnDestroyComponent:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnDestroyComponent))
+                                    {
+                                        m_currentObject = obj;
+                                        m_currentObject.CallOnDestroyComponents();
+                                    }
+                                    break;
+                                case MethodType.UpdateModels:
+                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.UpdateModels))
+                                    {
+                                        m_currentObject = obj;
+                                        m_currentObject.CallUpdateModels();
                                     }
                                     break;
                                 case MethodType.ActionExecuter:
@@ -174,8 +228,7 @@ namespace NetworkGameEngine
                         }
                         catch (Exception e)
                         {
-                            m_world.LogError($"Error in {m_objects[executedObjectIndex].Name}.{m_currentMethod} method: {e.Message}");
-                            executedObjectIndex++;
+                            m_world.LogError($"Fatal Error in method {m_currentMethod} of Workflow: {e.Message}");
                             continue;
                         }
                         m_currentMethod = MethodType.None;

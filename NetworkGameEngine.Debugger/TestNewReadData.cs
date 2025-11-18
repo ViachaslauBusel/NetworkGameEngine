@@ -1,7 +1,4 @@
-﻿using NetworkGameEngine.Debugger;
-using NUnit.Framework;
-using System.Numerics;
-using System.Threading.Tasks;
+﻿using System.Numerics;
 
 namespace NetworkGameEngine.UnitTests
 {

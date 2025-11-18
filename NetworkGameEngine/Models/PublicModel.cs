@@ -22,6 +22,7 @@ namespace NetworkGameEngine
         {
             if (IsInternalDirty())
             {
+                //Console.WriteLine($"Syncing data for {GetType().Name} in GameObject ID {GameObject.ID}");
                 SyncData();
             }
         }
