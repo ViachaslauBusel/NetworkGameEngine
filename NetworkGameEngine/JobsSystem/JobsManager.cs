@@ -10,9 +10,10 @@ namespace NetworkGameEngine.JobsSystem
         internal static ThreadJobExecutor RegisterThreadHandler(World world, Workflow workflow)
         {
             int thID = Thread.CurrentThread.ManagedThreadId;
-            if (m_jobsExecutor.TryAdd(thID, new ThreadJobExecutor(thID, world, workflow)))
+            var executor = new ThreadJobExecutor(thID, world, workflow);
+            if (m_jobsExecutor.TryAdd(thID, executor))
             {
-                return m_jobsExecutor[thID];
+                return executor;
             }
             throw new Exception("JobsSystem: Attempt to re-register a handler thread");
         }

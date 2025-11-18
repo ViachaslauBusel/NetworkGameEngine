@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 
 namespace NetworkGameEngine.JobsSystem
@@ -104,7 +103,9 @@ namespace NetworkGameEngine.JobsSystem
 
         internal static Job<T> FromException<T>(Exception ex)
         {
-            throw new NotImplementedException();
+            var job = new Job<T>();
+            job.ThrowException(ex);
+            return job;
         }
     }
 
