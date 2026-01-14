@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SomeSpaceName;
+using System;
 
 namespace NetworkGameEngine.Generator.Debug
 {

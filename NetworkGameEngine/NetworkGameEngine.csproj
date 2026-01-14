@@ -12,4 +12,8 @@
     <PackageReference Include="Autofac" Version="8.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\NetworkGameEngine.Generator\NetworkGameEngine.Generator.csproj" />
+  </ItemGroup>
+
 </Project>

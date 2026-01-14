@@ -1,53 +1,33 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
 
 namespace NetworkGameEngine.Generator
 {
     [Generator]
-    public class Generator : ISourceGenerator
+    public sealed class Generator : IIncrementalGenerator
     {
-        public void Execute(GeneratorExecutionContext context)
+        public void Initialize(IncrementalGeneratorInitializationContext context)
         {
+            // Берем только объявления классов + сразу тащим SemanticModel
+            var classesWithSemanticModel = context.SyntaxProvider
+                .CreateSyntaxProvider(
+                    predicate: static (node, _) => node is ClassDeclarationSyntax c && c.BaseList is not null,
+                    transform: static (ctx, _) => ((ClassDeclarationSyntax)ctx.Node, ctx.SemanticModel))
+                .Collect();
 
-
-        }
-
-        public void Initialize(GeneratorInitializationContext context)
-        {
-
-            var gameObjectText = SourceText.From(@"
-
-", Encoding.UTF8);
-
-
-
-            // Register the attribute source
-            context.RegisterForPostInitialization((i) =>
+            context.RegisterSourceOutput(classesWithSemanticModel, static (spc, items) =>
             {
-                i.AddSource("GameObject.g.cs", gameObjectText);
+                List<GeneratedSource> sources = new List<GeneratedSource>();
+                new CommandResultExtensionsGenerator("IReactCommandWithResultAsync<,>").GenerateSources(items, in sources);
+                new CommandResultExtensionsGenerator("IReactCommandWithResult<,>").GenerateSources(items, in sources);
+                new CommandResultExtensionsGenerator("IReactCommand<>").GenerateSources(items, in sources);
+
+                foreach (var source in sources)
+                {
+                    spc.AddSource(source.FileName, source.SourceCode);
+                }
             });
-
-            // Register a syntax receiver that will be created for each generation pass
-            context.RegisterForSyntaxNotifications(() => new SyntaxReceiver());
-        }
-
-    }
-    /// <summary>
-    /// Created on demand before each generation pass
-    /// </summary>
-    public class SyntaxReceiver : ISyntaxContextReceiver
-    {
-        public void OnVisitSyntaxNode(GeneratorSyntaxContext context)
-        {
-            if (context.Node is ClassDeclarationSyntax component)
-            {
-
-            }
         }
     }
 }

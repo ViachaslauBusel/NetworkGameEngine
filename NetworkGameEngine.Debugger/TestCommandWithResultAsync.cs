@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using NetworkGameEngine.JobsSystem;
 
 namespace NetworkGameEngine.UnitTests
 {
@@ -26,9 +22,10 @@ namespace NetworkGameEngine.UnitTests
         [Test]
         public void TestCommandWithResultM()
         {
-            TestCommandWithResultAsync();
+            TestCommandWithResultAsyncM();
         }
-        public async void TestCommandWithResultAsync()
+
+        public async void TestCommandWithResultAsyncM()
         {
             GameObject go = new GameObject();
             go.AddComponent<TestComponent>();
@@ -36,7 +33,7 @@ namespace NetworkGameEngine.UnitTests
 
             World.AddGameObject(go);
             Thread.Sleep(600);
-            var result = await go.SendCommandAndReturnResultAsync<TestCMD_0, int>(cmd);
+            var result = await go.SendCommandAndReturnResult<TestCMD_0, int>(cmd);
 
             Assert.AreEqual(1, result.Result);
         }

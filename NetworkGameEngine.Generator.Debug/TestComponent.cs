@@ -1,45 +1,36 @@
 ﻿using NetworkGameEngine;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using NetworkGameEngine.Generator.Debug;
+using NetworkGameEngine.JobsSystem;
 
-
-public class TestComponent : Component, IReactCommand<TestCommand>
+namespace SomeSpaceName
 {
-
-
-    public TestComponent(int myIntValue)
+    public class TestComponent : Component, IReactCommandWithResultAsync<TestRetAsyncCommand, bool>,
+                                            IReactCommandWithResult<TestRetCommand, bool>,
+                                            IReactCommand<TestNoRetCommand>
     {
+        private int v;
 
-    }
-    public override void Init()
-    {
-    }
+        public TestComponent(int v)
+        {
+            this.v = v;
+        }
 
-    public override void Start()
-    {
-    }
+        public bool ReactCommand(ref TestRetCommand command)
+        {
+            return true;
+        }
 
-    public override void Update()
-    {
-    }
+        public void ReactCommand(ref TestNoRetCommand command)
+        {
+            return;
+        }
 
-    public void React(TestCommand command)
-    {
-    }
+        //------------------------------------------------------
 
-    public override void OnDestroy()
-    {
-    }
-
-    
-
-    //------------------------------------------------------
-
-    public void ReactCommand(ref TestCommand command)
-    {
+        public async Job<bool> ReactCommandAsync(TestRetAsyncCommand command)
+        {
+            await Job.Delay(100);
+            return true;
+        }
     }
 }
-
