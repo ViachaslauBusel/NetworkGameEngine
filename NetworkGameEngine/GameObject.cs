@@ -10,9 +10,8 @@ namespace NetworkGameEngine
         private string m_name;
         private int m_threadID = 0;
         private bool m_isDestroyed = false;
-        private bool m_isActive = true;
+        private bool m_isActive = false;
         private World m_world;
-        private Dictionary<Type, List<MethodInfo>> m_injectMethodsCache = new Dictionary<Type, List<MethodInfo>>();
 
         public string Name => m_name;
         public uint ID { get; private set; }
@@ -53,40 +52,17 @@ namespace NetworkGameEngine
             return m_threadID == Thread.CurrentThread.ManagedThreadId && this == m_world.Workflows.GetCurrentWorkflow().CurrentGameObject;
         }
 
-        public void InjectDependenciesIntoObject(Object component)
-        {
-            var type = component.GetType();
-
-            // Cache method lookup to avoid redundant reflection
-            if (!m_injectMethodsCache.TryGetValue(type, out var methods))
-            {
-                methods = ReflectionHelper.GetAllMethods(type)
-                                          .Where(m => m.GetCustomAttributes(typeof(InjectAttribute), true).Any())
-                                          .ToList();
-
-                m_injectMethodsCache[type] = methods;
-            }
-
-            foreach (var method in methods)
-            {
-                // Cache resolved dependencies for the method parameters
-                var parameters = method.GetParameters()
-                                       .Select(p => m_world.Resolve(p.ParameterType))
-                                       .ToArray();
-
-                method.Invoke(component, parameters);
-            }
-        }
-
+        public void InjectDependenciesIntoObject(Object component) => m_world.InjectDependenciesIntoObject(component);
 
         internal void Init(uint objectID, int threadID, World world)
         {
             ID = objectID;
             m_threadID = threadID;
             m_world = world;
+            m_isActive = true;
         }
 
-        internal void Destroy()
+        internal void ScheduleDestroy()
         {
             foreach (var comp in m_components)
             {
@@ -94,6 +70,15 @@ namespace NetworkGameEngine
             }
             m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDestroyComponent);
             m_isDestroyed = true;
+        }
+
+        public void Destroy()
+        {
+            if (m_world == null)
+            {
+                throw new InvalidOperationException("GameObject is not part of a world");
+            }
+            m_world.RemoveGameObject(this.ID);
         }
     }
 }

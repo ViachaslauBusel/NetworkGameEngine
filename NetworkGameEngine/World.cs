@@ -1,9 +1,11 @@
 ﻿using Autofac;
+using NetworkGameEngine.DependencyInjection;
 using NetworkGameEngine.Diagnostics;
 using NetworkGameEngine.Interfaces;
 using NetworkGameEngine.Tools;
 using NetworkGameEngine.Workflows;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace NetworkGameEngine
 {
@@ -21,10 +23,12 @@ namespace NetworkGameEngine
         private List<IContainer> m_containers;
         private ConcurrentDictionary<uint, GameObject> m_objects = new ConcurrentDictionary<uint, GameObject>();
         private ConcurrentQueue<AddingObjectTask> m_addObjects = new ConcurrentQueue<AddingObjectTask>();
+        private List<AddingObjectTask> m_addedObjectTasks = new List<AddingObjectTask>();
         private ConcurrentQueue<RemovingObjectTask> m_removeObjects = new ConcurrentQueue<RemovingObjectTask>();
         private List<GameObject> m_removedObjects = new List<GameObject>();
         private List<IUpdatableService> _updatableServices = new List<IUpdatableService>();
         private List<IThreadAwareUpdatableService> _threadAwareUpdatableServices = new List<IThreadAwareUpdatableService>();
+        private Dictionary<Type, List<MethodInfo>> m_injectMethodsCache = new Dictionary<Type, List<MethodInfo>>();
         private uint m_generatorID = 1;
         private WorkflowPool m_workflows;
         private int m_addObjectThIndex = 0;
@@ -72,6 +76,34 @@ namespace NetworkGameEngine
                 }
             }
             return default;
+        }
+
+        public void InjectDependenciesIntoObject(Object component)
+        {
+            lock (m_injectMethodsCache)
+            {
+                var type = component.GetType();
+
+                // Cache method lookup to avoid redundant reflection
+                if (!m_injectMethodsCache.TryGetValue(type, out var methods))
+                {
+                    methods = ReflectionHelper.GetAllMethods(type)
+                                              .Where(m => m.GetCustomAttributes(typeof(InjectAttribute), true).Any())
+                                              .ToList();
+
+                    m_injectMethodsCache[type] = methods;
+                }
+
+                foreach (var method in methods)
+                {
+                    // Cache resolved dependencies for the method parameters
+                    var parameters = method.GetParameters()
+                                           .Select(p => Resolve(p.ParameterType))
+                                           .ToArray();
+
+                    method.Invoke(component, parameters);
+                }
+            }
         }
 
         /// <summary>
@@ -164,7 +196,7 @@ namespace NetworkGameEngine
                 m_addObjectThIndex = (m_addObjectThIndex + 1) % m_workflows.Count;
 
                 task.GameObjectID = obj.ID;
-                task.Completed(true);
+                m_addedObjectTasks.Add(task);
             }
 
             ExecuteMethod(MethodType.PrepareComponent);
@@ -187,7 +219,7 @@ namespace NetworkGameEngine
                     GameObject removeObj = m_objects[task.GameObjectID];
                     m_removedObjects.Add(removeObj);
 
-                    removeObj.Destroy();
+                    removeObj.ScheduleDestroy();
                 }
                 task.Completed(isObjectFound);
             }
@@ -217,6 +249,16 @@ namespace NetworkGameEngine
                 for (int i = 0; i < m_workflows.Count; i++) { m_workflows.GetWorkflowByIndex(i).Execute(() => service.Update(i, m_workflows.Count)); }
                 foreach (var th in m_workflows.AllWorkflows) { th.Wait(); }
             }
+
+            if (m_addedObjectTasks.Count > 0)
+            {
+                foreach (var addedTask in m_addedObjectTasks)
+                {
+                    addedTask.Completed(true);
+                }
+                m_addedObjectTasks.Clear();
+            }
+
             _executuinProfiler?.StopMethodProfiling(MethodType.MultiThreadService);
         }
 

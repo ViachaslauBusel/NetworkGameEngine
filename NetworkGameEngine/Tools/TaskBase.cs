@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace NetworkGameEngine.Tools
@@ -17,26 +18,28 @@ namespace NetworkGameEngine.Tools
         public bool IsCanceled { get; private set; } = false;
         public bool IsFaulted { get; private set; } = false;
 
+        // Replace blocking Task.Run waiter with a TCS to remove scheduling latency
+        private TaskCompletionSource<bool> _tcs; // lazily created
 
-
-
-        public Task<bool> Wait() => Task.Run(() =>
+        public Task<bool> Wait()
         {
+            // Fast-path if already completed
+            if (IsCompleted)
+            {
+                return Task.FromResult(IsCompletedSuccessfully);
+            }
+
+            // Create the TCS lazily and thread-safely
             lock (m_locker)
             {
-                long startStamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                while (!IsCompleted)
+                if (IsCompleted)
                 {
-                    Monitor.Wait(m_locker, 100);
-                    if ((DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - startStamp) > MAX_ATTEMPT_TIME)
-                    {
-                        Abort();
-                    }
+                    return Task.FromResult(IsCompletedSuccessfully);
                 }
-                return IsCompletedSuccessfully;
+                _tcs ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                return _tcs.Task;
             }
-        });
-
+        }
 
         public void Abort()
         {
@@ -47,7 +50,10 @@ namespace NetworkGameEngine.Tools
                 IsCompletedSuccessfully = false;
                 IsFaulted = true;
                 IsCanceled = true;
+                // Wake any legacy waiters
                 Monitor.Pulse(m_locker);
+                // Complete async waiters without extra scheduling
+                _tcs?.TrySetResult(false);
             }
         }
         public void Completed(bool result)
@@ -59,7 +65,10 @@ namespace NetworkGameEngine.Tools
                 IsCompletedSuccessfully = result;
                 IsFaulted = !result;
                 IsCanceled = false;
+                // Wake any legacy waiters
                 Monitor.Pulse(m_locker);
+                // Complete async waiters without extra scheduling
+                _tcs?.TrySetResult(result);
             }
         }
     }

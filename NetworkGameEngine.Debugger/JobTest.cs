@@ -1,5 +1,6 @@
 ﻿using NetworkGameEngine.JobsSystem;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace NetworkGameEngine.UnitTests
 {
@@ -17,15 +18,24 @@ namespace NetworkGameEngine.UnitTests
             Stopwatch stopwatch = Stopwatch.StartNew();
             TestWait();
             stopwatch.Stop();
+            stopwatch = Stopwatch.StartNew();
+            TestWait();
+            stopwatch.Stop();
             Result = (int)stopwatch.ElapsedMilliseconds;
         }
 
-        public async void TestWait()
+        public async Job TestWait()
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
-            await Job.Wait(Task.Delay(500));
+            await Job.Run(() => Thread.Sleep(500));
             stopwatch.Stop();
             Result2 = (int)stopwatch.ElapsedMilliseconds;
+        }
+
+        private async Task RunTask()
+        {
+            Thread.Sleep(250);
+            await Task.Delay(250);
         }
     }
     public class JobTest : WorldTestBase
@@ -37,10 +47,10 @@ namespace NetworkGameEngine.UnitTests
             var jobTestComponent = new JobTestComponent();
             obj.AddComponent(jobTestComponent);
             World.AddGameObject(obj);
-            Thread.Sleep(50);
+            Thread.Sleep(600);
 
-            Assert.LessOrEqual(1, jobTestComponent.Result);
-            Assert.GreaterOrEqual(500, jobTestComponent.Result);
+            Assert.LessOrEqual(jobTestComponent.Result, 1);
+            Assert.GreaterOrEqual(jobTestComponent.Result2, 500);
         }
     }
 }

@@ -2,13 +2,18 @@
 {
     public struct CommandResult<T>
     {
-        public bool IsFailed { get; private set; }
-        public T Result { get; private set; }
+        private readonly T m_result;
+        private readonly bool m_isSuccess;
 
-        public CommandResult(bool isFailed, T result)
+        public bool IsSuccess => m_isSuccess;
+        public bool IsFailed => !m_isSuccess;
+        public T Result => m_result;
+
+
+        public CommandResult(bool isSuccess, T result)
         {
-            IsFailed = isFailed;
-            Result = result;
+            m_isSuccess = isSuccess;
+            m_result = result;
         }
     }
 }

@@ -59,6 +59,6 @@ namespace NetworkGameEngine.JobsSystem
         internal void AddJob(IJob job)
         {
             m_jobs.AddFirst(new JobEntry(job, m_workflow.CurrentGameObject));
-        } 
+        }
     }
 }

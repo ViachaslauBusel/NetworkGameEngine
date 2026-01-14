@@ -14,6 +14,7 @@ namespace NetworkGameEngine.JobsSystem
         public virtual bool IsCompleted => _isCompleted;
         public bool IsFaulted => _exception != null;
         public Exception Exception => _exception;
+        public bool Result => GetResult();
         public virtual bool GetResult()
         {
             if (!IsCompleted) throw new InvalidOperationException("Job is not completed yet");
@@ -101,6 +102,11 @@ namespace NetworkGameEngine.JobsSystem
             }));
         }
 
+        public static Job WhenAll(params IJob[] jobs)
+        {
+            return WhenAll((IEnumerable<IJob>)jobs);
+        }
+
         internal static Job<T> FromException<T>(Exception ex)
         {
             var job = new Job<T>();
@@ -121,6 +127,7 @@ namespace NetworkGameEngine.JobsSystem
         public bool IsCompleted => _isCompleted;
         public bool IsFaulted => _exception != null;
         public Exception Exception => _exception;
+        public T Result => GetResult();
 
         public Job<T> GetAwaiter() => this;
 
@@ -140,6 +147,11 @@ namespace NetworkGameEngine.JobsSystem
         public void OnCompleted(Action continuation)
         {
             _continuation += continuation;
+        }
+
+        public void ContinueWith(Action<Job<T>> continuation)
+        {
+            OnCompleted(() => continuation(this));
         }
 
         public void Wait()

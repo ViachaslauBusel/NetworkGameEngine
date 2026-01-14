@@ -195,13 +195,13 @@ namespace NetworkGameEngine
         /// <summary>
         /// Возвращает данные типа T (ключ 0). Если не поток-владелец — возвращает копию.
         /// </summary>
-        public bool TryGetModel<T>(int key, out T result) where T : LocalModel
+        public bool TryGetModel<T>(int key, out T result) where T : class
         {
             result = GetModel<T>(key);
             return result != null;
         }
 
-        public bool TryGetModel<T>(out T result) where T : LocalModel
+        public bool TryGetModel<T>(out T result) where T : class
         {
             return TryGetModel(0, out result);
         }
@@ -209,7 +209,7 @@ namespace NetworkGameEngine
         /// <summary>
         /// Возвращает данные типа T по ключу. Если не поток-владелец — возвращает копию.
         /// </summary>
-        public T GetModel<T>(int key = 0) where T : LocalModel
+        public T GetModel<T>(int key = 0) where T : class
         {
             var requestedType = typeof(T);
             LocalModel value = null;
@@ -236,19 +236,19 @@ namespace NetworkGameEngine
                 }
             }
 
-            if (value == null) return null;
+            if (value == null) return default;
 
             if (IsCurrentThreadOwner())
-                return (T)value;
+                return value as T;
 
-            return (T)value.GetClone();
+            return value.GetClone() as T;
         }
 
         /// <summary>
         /// Возвращает все данные, совместимые с T (включая наследников/интерфейсы).
         /// Для чужих потоков — возвращает копии.
         /// </summary>
-        public List<T> GetAllModel<T>() where T : LocalModel
+        public List<T> GetAllModel<T>() where T : class
         {
             bool isOwner = IsCurrentThreadOwner();
             var result = new List<T>();
@@ -261,7 +261,7 @@ namespace NetworkGameEngine
                     {
                         if (v is T t)
                         {
-                            result.Add(isOwner ? t : (T)v.GetClone());
+                            result.Add(isOwner ? t : v.GetClone() as T);
                         }
                     }
                 }

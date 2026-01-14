@@ -144,8 +144,8 @@ namespace NetworkGameEngine
             return t;
         }
 
-        public T GetModel<T>(int key = 0) where T : LocalModel => m_gameObject.GetModel<T>(key);
-        public List<T> GetAllModel<T>() where T : LocalModel => m_gameObject.GetAllModel<T>();
-        public bool TryGetModel<T>(int key, out T result) where T : LocalModel => m_gameObject.TryGetModel<T>(key, out result);
+        public T GetModel<T>(int key = 0) where T : class => m_gameObject.GetModel<T>(key);
+        public List<T> GetAllModel<T>() where T : class => m_gameObject.GetAllModel<T>();
+        public bool TryGetModel<T>(int key, out T result) where T : class => m_gameObject.TryGetModel<T>(key, out result);
     }
 }

@@ -224,7 +224,6 @@ namespace NetworkGameEngine
                                 default:
                                     throw new Exception("invalid object processing state");
                             }
-                            m_currentObject = null;
                         }
                         catch (Exception e)
                         {
@@ -232,6 +231,7 @@ namespace NetworkGameEngine
                             continue;
                         }
                         m_currentMethod = MethodType.None;
+                        m_currentObject = null;
                     }
                     Monitor.PulseAll(m_locker);
                 }

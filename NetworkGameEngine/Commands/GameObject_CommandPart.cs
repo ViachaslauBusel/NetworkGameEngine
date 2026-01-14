@@ -3,18 +3,20 @@ using System.Collections.Concurrent;
 
 namespace NetworkGameEngine
 {
-    internal class CommandContainerWithResut<T, TResult> : CommandContainer where T : ICommand
+    internal class CommandContainerWithResult<T, TResult> : CommandContainer where T : ICommand
     {
         private T m_command;
         private TResult m_result;
-        private volatile bool m_isCompleted = false;
+        private Job<TResult> m_resultAsync;
+        private volatile bool m_isDispatched = false;
         private volatile bool m_isCanceled = false;
 
-        public bool IsCompleted => m_isCompleted;
+        public bool IsDispatched => m_isDispatched;
         public bool IsCanceled => m_isCanceled;
         public TResult Result => m_result;
+        public bool IsAsync => m_resultAsync != null;
 
-        internal CommandContainerWithResut(T command)
+        internal CommandContainerWithResult(T command)
         {
             m_command = command;
         }
@@ -27,12 +29,31 @@ namespace NetworkGameEngine
             {
                 if (m_isCanceled)
                 {
-                    m_isCompleted = true;
+                    m_isDispatched = true;
                     return;
                 }
-                IReactCommandWithResult<T, TResult> reactCommand = cmdListener as IReactCommandWithResult<T, TResult>;
-                m_result = reactCommand.ReactCommand(ref m_command);
-                m_isCompleted = true;
+                if (cmdListener is IReactCommandWithResult<T, TResult> reactCommand)
+                {
+                    m_result = reactCommand.ReactCommand(ref m_command);
+                    m_isDispatched = true;
+                }
+                else if (cmdListener is IReactCommandWithResultAsync<T, TResult> reactCommandAsync)
+                {
+                    m_resultAsync = reactCommandAsync.ReactCommandAsync(m_command);
+                    m_isDispatched = true;
+                }
+                else
+                {
+                    m_isCanceled = true;
+                }
+            }
+        }
+
+        internal async Job WaitForAsyncResult()
+        {
+            if (m_resultAsync != null)
+            {
+                m_result = await m_resultAsync;
             }
         }
 
@@ -40,7 +61,7 @@ namespace NetworkGameEngine
         {
             lock (this)
             {
-                if (m_isCompleted) return false;
+                if (m_isDispatched) return false;
                 m_isCanceled = true;
                 return true;
             }
@@ -93,6 +114,10 @@ namespace NetworkGameEngine
                 {
                     AddListenerWithResult(@interface.GenericTypeArguments[0], c);
                 }
+                if (@interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResultAsync<,>))
+                {
+                    AddListenerWithResult(@interface.GenericTypeArguments[0], c);
+                }
             }
         }
 
@@ -105,6 +130,10 @@ namespace NetworkGameEngine
                     RemoveListener(@interface.GenericTypeArguments[0], c);
                 }
                 if (@interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResult<,>))
+                {
+                    RemoveListenerWithResult(@interface.GenericTypeArguments[0]);
+                }
+                if (@interface.GetGenericTypeDefinition() == typeof(IReactCommandWithResultAsync<,>))
                 {
                     RemoveListenerWithResult(@interface.GenericTypeArguments[0]);
                 }
@@ -206,7 +235,7 @@ namespace NetworkGameEngine
 
         public async Job<CommandResult<TResult>> SendCommandAndReturnResult<T, TResult>(T command, int waitTime = 0) where T : ICommand
         {
-           var commandContainer = new CommandContainerWithResut<T, TResult>(command);
+           var commandContainer = new CommandContainerWithResult<T, TResult>(command);
             m_commandsWithResult.Enqueue(commandContainer);
 
             lock (m_cmdLockObject)
@@ -215,17 +244,22 @@ namespace NetworkGameEngine
             }
 
             long endWaitTime = Time.Milliseconds + waitTime;
-            await Job.WaitUntil(() => commandContainer.IsCompleted
+            await Job.WaitUntil(() => commandContainer.IsDispatched
                                       || commandContainer.IsCanceled
                                       || endWaitTime < Time.Milliseconds);
 
 
-            if (!commandContainer.IsCompleted && commandContainer.TryCancel())
+            if (!commandContainer.IsDispatched && commandContainer.TryCancel())
             {
-                return new CommandResult<TResult>(true, default);
+                return new CommandResult<TResult>(false, default);
             }
 
-            return new CommandResult<TResult>(false, commandContainer.Result);
+            if (commandContainer.IsAsync)
+            {
+                await commandContainer.WaitForAsyncResult();
+            }
+
+            return new CommandResult<TResult>(true, commandContainer.Result);
         }
     }
 }

@@ -159,5 +159,12 @@ namespace NetworkGameEngine.JobsSystem
             }, (func, job), preferLocal: true);
             return job;
         }
+
+        public static Job<T> FromResult<T>(T result)
+        {
+            var job = new Job<T>();
+            job.Complete(result);
+            return job;
+        }
     }
 }

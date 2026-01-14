@@ -41,7 +41,15 @@ namespace NetworkGameEngine.JobsSystem
 
         public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine) where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
         {
-            awaiter.OnCompleted(stateMachine.MoveNext);
+            // Prefer UnsafeOnCompleted when available to skip ExecutionContext capture
+            if (awaiter is ICriticalNotifyCompletion cnc)
+            {
+                cnc.UnsafeOnCompleted(stateMachine.MoveNext);
+            }
+            else
+            {
+                awaiter.OnCompleted(stateMachine.MoveNext);
+            }
         }
 
         public Job<T> Task => _awaiter;
@@ -84,7 +92,15 @@ namespace NetworkGameEngine.JobsSystem
 
         public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine) where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
         {
-            awaiter.OnCompleted(stateMachine.MoveNext);
+            // Prefer UnsafeOnCompleted when available to skip ExecutionContext capture
+            if (awaiter is ICriticalNotifyCompletion cnc)
+            {
+                cnc.UnsafeOnCompleted(stateMachine.MoveNext);
+            }
+            else
+            {
+                awaiter.OnCompleted(stateMachine.MoveNext);
+            }
         }
 
         public Job Task => _awaiter;
