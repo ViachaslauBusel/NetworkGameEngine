@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\NetworkGameEngine.Generator\NetworkGameEngine.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\NetworkGameEngine\NetworkGameEngine.csproj" />
   </ItemGroup>
 

@@ -1,8 +1,6 @@
 using Autofac;
-using NetworkGameEngine;
-using NetworkGameEngine.UnitTests;
 
-namespace Test
+namespace NetworkGameEngine.UnitTests
 {
 
     public interface ITestService 
@@ -13,7 +11,7 @@ namespace Test
     {
         public string Name { get; set; }
     }
-    public class TestCommand : ICommand
+    public struct TestCommand : ICommand
     {
 
     }

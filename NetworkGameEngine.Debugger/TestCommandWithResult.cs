@@ -1,11 +1,12 @@
 ﻿namespace NetworkGameEngine.UnitTests
 {
+    public struct TestCMD_0 : ICommand
+    {
+        public string testValue => "Hello World_0!!!";
+    }
+
     internal class TestCommandWithResult
     {
-        public class TestCMD_0 : ICommand
-        {
-            public string testValue = "Hello World_0!!!";
-        }
 
         public class TestComponent : Component, IReactCommandWithResult<TestCMD_0, int>
         {

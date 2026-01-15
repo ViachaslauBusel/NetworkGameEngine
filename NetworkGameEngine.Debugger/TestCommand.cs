@@ -2,13 +2,13 @@
 
 namespace NetworkGameEngine.Debugger
 {
-    public class TestCMD_0 : ICommand
+    public struct TestCMD_0 : ICommand
     {
-        public string testValue = "Hello World_0!!!";
+        public string testValue => "Hello World_0!!!";
     }
-    public class TestCMD_1 : ICommand
+    public struct TestCMD_1 : ICommand
     {
-        public string testValue = "Hello World_1!!!";
+        public string testValue => "Hello World_1!!!";
     }
     public struct TestData_0 
     {
