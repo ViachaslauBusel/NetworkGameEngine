@@ -6,19 +6,22 @@ namespace NetworkGameEngine.Generator
     public readonly struct ArgumentTypeInfo
     {
         public string TypeName { get; }
+        public string ArgName { get; }
         public string Namespace { get; }
         public string FullName { get; }
 
-        public ArgumentTypeInfo(string typeName, string @namespace, string fullName)
+        public ArgumentTypeInfo(string typeName, string argName, string @namespace, string fullName)
         {
             TypeName = typeName;
+            ArgName = argName;
             Namespace = @namespace;
             FullName = fullName;
         }
 
-        public ArgumentTypeInfo(string typeName, string @namespace)
+        public ArgumentTypeInfo(string typeName, string argName, string @namespace)
         {
             TypeName = typeName;
+            ArgName = argName;
             Namespace = @namespace;
             FullName = string.IsNullOrEmpty(@namespace) ? typeName : $"{@namespace}.{typeName}";
         }
@@ -76,15 +79,14 @@ namespace NetworkGameEngine.Generator
             var typeSymbol = semanticModel.GetTypeInfo(typeSyntax).Type;
 
             if (typeSymbol is null)
-                return new ArgumentTypeInfo(typeSyntax.ToString(), string.Empty, typeSyntax.ToString());
+                return new ArgumentTypeInfo(typeSyntax.ToString(), string.Empty, string.Empty, typeSyntax.ToString());
 
             var ns = typeSymbol.ContainingNamespace?.ToDisplayString() ?? string.Empty;
 
             var fullName = typeSymbol
                 .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                 .Replace("global::", "");
-
-            return new ArgumentTypeInfo(typeSymbol.Name, ns, fullName);
+            return new ArgumentTypeInfo(typeSymbol.Name, string.Empty, ns, fullName);
         }
 
         private static int GetArityFromMetadataName(string metadataName)
@@ -112,10 +114,19 @@ namespace NetworkGameEngine.Generator
                 .Where(c => !c.IsImplicitlyDeclared) // обычно отбрасывают синтетический .ctor()
                 .Select(c => new TypeArgumentListInfo(
                     c.Parameters
-                        .Select(p => new ArgumentTypeInfo(
-                            p.Type.Name,
-                            p.Type.ContainingNamespace?.ToDisplayString() ?? string.Empty
-                        ))
+                     .Select(static p =>
+                     {
+                         var typeSymbol = p.Type;
+
+                         // "int?" / "string?" / "MyType?" etc.
+                         // If nullable annotations are enabled in the consuming project, this preserves them.
+                         var typeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                         var argName = p.Name;
+
+                         var ns = typeSymbol.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+
+                         return new ArgumentTypeInfo(typeName, argName, ns);
+                     })
                         .ToArray()
                 ))
                 .ToArray();

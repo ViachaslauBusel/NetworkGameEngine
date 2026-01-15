@@ -23,8 +23,13 @@ namespace NetworkGameEngine.Generator
                 new CommandResultExtensionsGenerator("IReactCommandWithResult<,>").GenerateSources(items, in sources);
                 new CommandResultExtensionsGenerator("IReactCommand<>").GenerateSources(items, in sources);
 
+                var emitted = new HashSet<string>(StringComparer.Ordinal);
+
                 foreach (var source in sources)
                 {
+                    if (!emitted.Add(source.FileName))
+                        continue;
+
                     spc.AddSource(source.FileName, source.SourceCode);
                 }
             });

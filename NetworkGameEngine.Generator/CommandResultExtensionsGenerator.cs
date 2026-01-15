@@ -44,7 +44,7 @@ namespace NetworkGameEngine.Generator
 
             var sourceBuilder = new StringBuilder(1024);
             AppendHeader(sourceBuilder, CollectUsings(commandType, resultType, constructors));
-            AppendNamespaceAndClassStart(sourceBuilder, commandType.Namespace, commandType.TypeName);
+            AppendNamespaceAndClassStart(sourceBuilder, commandType.Namespace, commandType.TypeName, resultType is null ? "VOID" : resultType.Value.TypeName);
 
             foreach (var ctor in constructors)
             {
@@ -114,22 +114,22 @@ namespace NetworkGameEngine.Generator
             sb.AppendLine();
         }
 
-        private static void AppendNamespaceAndClassStart(StringBuilder sb, string @namespace, string className)
+        private static void AppendNamespaceAndClassStart(StringBuilder sb, string @namespace, string className, string ext)
         {
             sb.AppendLine($"namespace {@namespace}");
             sb.AppendLine("{");
-            sb.AppendLine($"    public static class {className}_G");
+            sb.AppendLine($"    public static class {className}_{ext}");
             sb.AppendLine("    {");
         }
 
         private static void AppendResultExtensionMethod(StringBuilder sb, string commandTypeName, string resultTypeName, TypeArgumentListInfo ctor)
         {
-            sb.Append($"        public static Job<CommandResult<{resultTypeName}>> {commandTypeName.Replace("Command", "")}(this GameObject gameObject");
+            sb.Append($"        public static Job<CommandResult<{resultTypeName}>> {commandTypeName.Replace("Command", "")}Async(this GameObject gameObject");
 
             for (int i = 0; i < ctor.Arguments.Length; i++)
             {
                 var p = ctor.Arguments[i];
-                sb.Append($", {p.TypeName} arg_{i}");
+                sb.Append($", {p.TypeName} {p.ArgName}");
             }
 
             sb.AppendLine(")");
@@ -138,8 +138,9 @@ namespace NetworkGameEngine.Generator
 
             for (int i = 0; i < ctor.Arguments.Length; i++)
             {
+                var p = ctor.Arguments[i];
                 if (i > 0) sb.Append(", ");
-                sb.Append($"arg_{i}");
+                sb.Append($"{p.ArgName}");
             }
 
             sb.AppendLine(");");
@@ -169,7 +170,7 @@ namespace NetworkGameEngine.Generator
             }
 
             sb.AppendLine(");");
-            sb.AppendLine($"            return gameObject.SendCommand<{commandTypeName}>(command);");
+            sb.AppendLine($"            gameObject.SendCommand<{commandTypeName}>(command);");
             sb.AppendLine("        }");
             sb.AppendLine();
         }

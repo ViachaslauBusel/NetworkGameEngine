@@ -20,7 +20,7 @@ namespace NetworkGameEngine.Generator.Debug
             SomeValue = arg_0;
         }
 
-        public TestRetAsyncCommand(int arg_0, string arg_1, float arg_2)
+        public TestRetAsyncCommand(int arg_0, string seconArg, float justForTest)
         {
             SomeValue = arg_0;
         }
