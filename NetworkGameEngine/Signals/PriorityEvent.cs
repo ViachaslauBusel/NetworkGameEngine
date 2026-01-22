@@ -38,7 +38,6 @@ namespace NetworkGameEngine
         // ----------------------------------------------------------------------
         // Subscribe / Unsubscribe
         // ----------------------------------------------------------------------
-
         public void Subscribe(THandler handler, int order = 0)
         {
             var currentObj = GlobalWorkflowRegistry.GetCurrentWorkflow()?.CurrentGameObject;

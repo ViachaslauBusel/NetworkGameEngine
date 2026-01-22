@@ -219,7 +219,7 @@ namespace NetworkGameEngine
                     GameObject removeObj = m_objects[task.GameObjectID];
                     m_removedObjects.Add(removeObj);
 
-                    removeObj.ScheduleDestroy();
+                    removeObj.ScheduleDestroyComponent();
                 }
                 task.Completed(isObjectFound);
             }
@@ -233,6 +233,7 @@ namespace NetworkGameEngine
             {
                 m_objects.TryRemove(obj.ID, out _);
                 m_workflows.GetWorkflowByThreadId(obj.ThreadID).RemoveObject(obj);
+                obj.FinalizeDestroyObject();
             }
             m_removedObjects.Clear();
 

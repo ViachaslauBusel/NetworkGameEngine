@@ -62,14 +62,13 @@ namespace NetworkGameEngine
             m_isActive = true;
         }
 
-        internal void ScheduleDestroy()
+        internal void ScheduleDestroyComponent()
         {
             foreach (var comp in m_components)
             {
                 m_outgoingComponents.Add(comp.GetType());
             }
             m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDestroyComponent);
-            m_isDestroyed = true;
         }
 
         public void Destroy()
@@ -79,6 +78,21 @@ namespace NetworkGameEngine
                 throw new InvalidOperationException("GameObject is not part of a world");
             }
             m_world.RemoveGameObject(this.ID);
+        }
+
+        internal void FinalizeDestroyObject()
+        {
+            if (m_components.Count > 0)
+            {
+                m_world.LogError($"GameObject {Name}:{ID} being destroyed with components still attached.");
+            }
+            if (!m_isDestroyed)
+            {
+                m_world.LogError($"GameObject {Name}:{ID} destroyed.");
+            }
+            m_isDestroyed = true;
+            m_isActive = false;
+            m_world = null;
         }
     }
 }
