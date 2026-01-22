@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using NetworkGameEngine.Models;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace NetworkGameEngine
@@ -72,6 +73,12 @@ namespace NetworkGameEngine
                     {
                         var value = f.GetValue(this);
                         f.SetValue(_syncData, value);
+                    }
+                    // Ссылочные типы, только указаные типы
+                    else if (typeof(IlSyncedReference).IsAssignableFrom(f.FieldType))
+                    {
+                        var original = f.GetValue(this);
+                        f.SetValue(_syncData, original);
                     }
                 }
             }

@@ -156,7 +156,7 @@ namespace NetworkGameEngine.Generator
             for (int i = 0; i < ctor.Arguments.Length; i++)
             {
                 var p = ctor.Arguments[i];
-                sb.Append($", {p.TypeName} arg_{i}");
+                sb.Append($", {p.TypeName} {p.ArgName}");
             }
 
             sb.AppendLine(")");
@@ -165,8 +165,9 @@ namespace NetworkGameEngine.Generator
 
             for (int i = 0; i < ctor.Arguments.Length; i++)
             {
+                var p = ctor.Arguments[i];
                 if (i > 0) sb.Append(", ");
-                sb.Append($"arg_{i}");
+                sb.Append($"{p.ArgName}");
             }
 
             sb.AppendLine(");");

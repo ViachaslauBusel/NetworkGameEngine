@@ -1,10 +1,11 @@
-﻿using NetworkGameEngine.Signals.Commands;
+﻿using NetworkGameEngine.Models;
+using NetworkGameEngine.Signals.Commands;
 using NetworkGameEngine.Workflows;
 using System.Runtime.CompilerServices;
 
 namespace NetworkGameEngine
 {
-    public abstract class PriorityEventBase<THandler> where THandler : Delegate
+    public abstract class PriorityEventBase<THandler> : IlSyncedReference where THandler : Delegate
     {
         public readonly struct SubscriptionEntry
         {
