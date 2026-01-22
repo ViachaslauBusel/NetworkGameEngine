@@ -302,10 +302,33 @@ namespace NetworkGameEngine
                         m_world.LogError($"Exception in OnDisable of component {component.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
                     }
                     m_methodComponents.Register(component, MethodType.OnDestroyComponent);
+                }
+                //Удаляем компоненты которые еще не были добавлены
+                lock (m_incomingComponents)
+                {
+                    if (!m_incomingComponents.IsEmpty)
+                    {
+                        var kept = new List<Component>(capacity: 8);
 
-                  
+                        while (m_incomingComponents.TryDequeue(out var pending))
+                        {
+                            if (pending.GetType() == removeType)
+                            {
+                                // Чтобы AddComponentAsync не зависал на State == None
+                                pending.InternalSetError();
+                                continue;
+                            }
+
+                            kept.Add(pending);
+                        }
+
+                        foreach (var pending in kept)
+                            m_incomingComponents.Enqueue(pending);
+                    }
                 }
             }
+
+          
 
             foreach (var component in m_methodComponents.GetTargetsFor(MethodType.OnDestroyComponent))
             {

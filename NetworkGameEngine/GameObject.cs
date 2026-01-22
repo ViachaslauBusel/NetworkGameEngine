@@ -92,7 +92,6 @@ namespace NetworkGameEngine
             }
             m_isDestroyed = true;
             m_isActive = false;
-            m_world = null;
         }
     }
 }
