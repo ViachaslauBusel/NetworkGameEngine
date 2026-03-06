@@ -1,7 +1,6 @@
 ﻿using NetworkGameEngine.Components;
 using NetworkGameEngine.JobsSystem;
 using System.Collections.Concurrent;
-using System.ComponentModel;
 using System.Diagnostics;
 
 namespace NetworkGameEngine
@@ -10,8 +9,8 @@ namespace NetworkGameEngine
     {
         private ConcurrentQueue<Component> m_incomingComponents = new ConcurrentQueue<Component>();
         private ConcurrentBag<Type> m_outgoingComponents = new ConcurrentBag<Type>();
-        private LinkedList<Component> m_components = new LinkedList<Component>();
-        private ComponentCallRegistry m_methodComponents = new();
+        private Dictionary<Type, Component> m_components = new ();
+        private ComponentCallRegistry m_methodComponents = new ();
 
         internal bool HasIncomingComponents => !m_incomingComponents.IsEmpty;
         internal bool HasUpdateComponents => m_methodComponents.GetTargetsFor(MethodType.UpdateComponent).Any();
@@ -49,10 +48,16 @@ namespace NetworkGameEngine
             Debug.Assert(ThreadID == Thread.CurrentThread.ManagedThreadId,
                    "Was called by a thread that does not own this data");
 
-            var value = m_components.FirstOrDefault(c => c is T);
-            if (value != null)
+            if (m_components.TryGetValue(typeof(T), out Component component))
             {
-                return value as T;
+                return component as T;
+            }
+            foreach (var c in m_components.Values)
+            {
+                if (c is T)
+                {
+                    return c as T;
+                }
             }
             return default;
         }
@@ -63,7 +68,7 @@ namespace NetworkGameEngine
                                   "Was called by a thread that does not own this data");
 
             List<T> components = new List<T>();
-            foreach (var c in m_components)
+            foreach (var c in m_components.Values)
             {
                 if (c is T)
                 {
@@ -102,13 +107,13 @@ namespace NetworkGameEngine
         {
             while (m_incomingComponents.TryDequeue(out Component newComponent))
             {
-                if (m_components.Any(c => newComponent.GetType() == c.GetType()))
+                if (m_components.ContainsKey(newComponent.GetType()))
                 {
                     newComponent.InternalSetError();
                     continue;
                 }
                 newComponent.InternalInit(this);
-                m_components.AddLast(newComponent);
+                m_components.Add(newComponent.GetType(), newComponent);
                 m_methodComponents.Register(newComponent, MethodType.InitComponent);
             }
 
@@ -156,7 +161,7 @@ namespace NetworkGameEngine
         /// </summary>
         internal void CallOnEnableComponents()
         {
-            foreach (var c in m_components)
+            foreach (var c in m_components.Values)
             {
                 try
                 {
@@ -187,6 +192,7 @@ namespace NetworkGameEngine
             //m_methodComponents.Clear(MethodType.OnEnableComponent);
             m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.OnEnableComponent);
         }
+
         /// <summary>
         /// Вызывается один раз после Init если компонент и GameObject активны или при активации GameObject или компонента
         /// </summary>
@@ -212,8 +218,14 @@ namespace NetworkGameEngine
         internal void CallOnUpdateComponents()
         {
             if (!m_isActive) return;
-            foreach (var c in m_methodComponents.GetTargetsFor(MethodType.UpdateComponent))
+
+            LinkedList<Component> components = m_methodComponents.GetTargetsFor(MethodType.UpdateComponent);
+            if (components.Count == 0) return;
+            
+            var node = components.First;
+            while (node != null)
             {
+                var c = node.Value;
                 if (c.Enabled)
                 {
                     try
@@ -225,6 +237,7 @@ namespace NetworkGameEngine
                         m_world.LogError($"Exception in Update of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
                     }
                 }
+                node = node.Next;
             }
         }
 
@@ -250,7 +263,7 @@ namespace NetworkGameEngine
 
         internal void CallOnDisableComponents()
         {
-            foreach (var component in m_components)
+            foreach (var component in m_components.Values)
             {
                 try
                 {
@@ -289,8 +302,7 @@ namespace NetworkGameEngine
         {
             while (m_outgoingComponents.TryTake(out Type removeType))
             {
-                var component = m_components.FirstOrDefault(c => c.GetType() == removeType);
-                if (component != null)
+                if (m_components.TryGetValue(removeType, out Component component))
                 {
                     component.InternalDestroy();
                     try
@@ -341,7 +353,7 @@ namespace NetworkGameEngine
                     m_world.LogError($"Exception in OnDestroy of component {component.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
                 }
 
-                m_components.Remove(component);
+                m_components.Remove(component.GetType());
 
                 UnregisterCommandListenersForComponent(component);
 

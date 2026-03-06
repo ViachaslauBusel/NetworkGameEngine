@@ -64,7 +64,7 @@ namespace NetworkGameEngine
 
         internal void ScheduleDestroyComponent()
         {
-            foreach (var comp in m_components)
+            foreach (var comp in m_components.Values)
             {
                 m_outgoingComponents.Add(comp.GetType());
             }
