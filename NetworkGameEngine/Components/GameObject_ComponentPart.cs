@@ -2,6 +2,8 @@
 using NetworkGameEngine.JobsSystem;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace NetworkGameEngine
 {
@@ -107,19 +109,22 @@ namespace NetworkGameEngine
         {
             while (m_incomingComponents.TryDequeue(out Component newComponent))
             {
+                newComponent.InternalInit(this);
                 if (m_components.ContainsKey(newComponent.GetType()))
                 {
                     newComponent.InternalSetError();
                     continue;
                 }
-                newComponent.InternalInit(this);
                 m_components.Add(newComponent.GetType(), newComponent);
                 m_methodComponents.Register(newComponent, MethodType.InitComponent);
             }
 
             //Register command listener
-            foreach (var c in m_methodComponents.GetTargetsFor(MethodType.InitComponent))
+            var componentsToInit = m_methodComponents.GetTargetsFor(MethodType.InitComponent);
+            int count = componentsToInit.Count;
+            for (int i = 0; i < count; i++)
             {
+                var c = componentsToInit[i];
                 RegisterCommandListenersForComponent(c);
                 InjectDependenciesIntoObject(c);
             }
@@ -137,16 +142,12 @@ namespace NetworkGameEngine
 
         internal void CallInitComponents()
         {
-            foreach (var c in m_methodComponents.GetTargetsFor(MethodType.InitComponent))
+            var componentsToInit = m_methodComponents.GetTargetsFor(MethodType.InitComponent);
+            var span = CollectionsMarshal.AsSpan(componentsToInit);
+            for (int i = 0; i < span.Length; i++)
             {
-                try
-                {
-                    c.Init();
-                }
-                catch (Exception ex)
-                {
-                    m_world.LogError($"Exception in Init of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
-                }
+                var c = span[i];
+                InitComponentSafe(c);
                 if (IsActive && c.Enabled)
                 {
                     m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnEnableComponent);
@@ -154,6 +155,19 @@ namespace NetworkGameEngine
             }
             m_methodComponents.Clear(MethodType.InitComponent);
             m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.InitComponent);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void InitComponentSafe(Component component)
+        {
+            try
+            {
+                component.Init();
+            }
+            catch (Exception ex)
+            {
+                m_world.LogError($"Exception in Init of component {component.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
+            }
         }
 
         /// <summary>
@@ -198,65 +212,90 @@ namespace NetworkGameEngine
         /// </summary>
         internal void CallOnStartComponents()
         {
-            foreach (var c in m_methodComponents.GetTargetsFor(MethodType.StartComponent))
+            var componentsToStart = m_methodComponents.GetTargetsFor(MethodType.StartComponent);
+            var span = CollectionsMarshal.AsSpan(componentsToStart);
+            for (int i = 0; i < span.Length; i++)
             {
-                try
-                {
-                    if (!c.IsStarted)
-                    c.Start();
-                }
-                catch (Exception ex)
-                {
-                    m_world.LogError($"Exception in Start of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
-                }
+                var c = span[i];
+                if (c.IsStarted) continue;
+
+                StartComponentSafe(c);
                 c.SetStarted();
             }
             m_methodComponents.Clear(MethodType.StartComponent);
             m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.StartComponent);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void StartComponentSafe(Component component)
+        {
+            try
+            {
+                component.Start();
+            }
+            catch (Exception ex)
+            {
+                m_world.LogError($"Exception in Start of component {component.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
+            }
+        }
+
         internal void CallOnUpdateComponents()
         {
             if (!m_isActive) return;
 
-            LinkedList<Component> components = m_methodComponents.GetTargetsFor(MethodType.UpdateComponent);
-            if (components.Count == 0) return;
-            
-            var node = components.First;
-            while (node != null)
+            var components = m_methodComponents.GetTargetsFor(MethodType.UpdateComponent);
+            var span = CollectionsMarshal.AsSpan(components);
+            for (int i = 0; i < span.Length; i++)
             {
-                var c = node.Value;
-                if (c.Enabled)
-                {
-                    try
-                    {
-                        c.Update();
-                    }
-                    catch (Exception ex)
-                    {
-                        m_world.LogError($"Exception in Update of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
-                    }
-                }
-                node = node.Next;
+                var component = span[i];
+
+                if (!component.Enabled)
+                    continue;
+
+                UpdateComponentSafe(component);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void UpdateComponentSafe(Component component)
+        {
+            try
+            {
+                component.Update();
+            }
+            catch (Exception ex)
+            {
+                m_world.LogError(
+                    $"Exception in Update of component {component.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
             }
         }
 
         internal void CallOnLateUpdateComponents()
         {
             if (!m_isActive) return;
-            foreach (var c in m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent))
+            var components = m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent);
+            var span = CollectionsMarshal.AsSpan(components);
+            for (int i = 0; i < span.Length; i++)
             {
-                if (c.Enabled)
-                {
-                    try
-                    {
-                        c.LateUpdate();
-                    }
-                    catch (Exception ex)
-                    {
-                        m_world.LogError($"Exception in LateUpdate of component {c.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
-                    }
-                }
+                var component = span[i];
+
+                if (!component.Enabled) continue;
+
+                LateUpdateComponentSafe(component);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void LateUpdateComponentSafe(Component component)
+        {
+            try
+            {
+                component.LateUpdate();
+            }
+            catch (Exception ex)
+            {
+                m_world.LogError(
+                    $"Exception in LateUpdate of component {component.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
             }
         }
 
@@ -280,7 +319,7 @@ namespace NetworkGameEngine
                 if (component.HasUpdateOverride)
                 {
                     m_methodComponents.Unregister(component, MethodType.UpdateComponent);
-                    if (m_methodComponents.GetTargetsFor(MethodType.UpdateComponent).Count() == 0)
+                    if (m_methodComponents.GetTargetsFor(MethodType.UpdateComponent).Count == 0)
                     {
                         m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.UpdateComponent);
                     }
@@ -288,7 +327,7 @@ namespace NetworkGameEngine
                 if (component.HasLateUpdateOverride)
                 {
                     m_methodComponents.Unregister(component, MethodType.LateUpdateComponent);
-                    if (m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent).Count() == 0)
+                    if (m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent).Count == 0)
                     {
                         m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.LateUpdateComponent);
                     }
@@ -341,9 +380,11 @@ namespace NetworkGameEngine
             }
 
           
-
-            foreach (var component in m_methodComponents.GetTargetsFor(MethodType.OnDestroyComponent))
+            var componentsToDestroy = m_methodComponents.GetTargetsFor(MethodType.OnDestroyComponent);
+            int count = componentsToDestroy.Count;
+            for (int i = 0; i < count; i++)
             {
+                var component = componentsToDestroy[i];
                 try
                 {
                     component.OnDestroy();

@@ -1,42 +1,42 @@
-﻿namespace NetworkGameEngine.Components
+﻿using System.Runtime.CompilerServices;
+
+namespace NetworkGameEngine.Components
 {
-    internal class ComponentCallRegistry
+    internal sealed class ComponentCallRegistry
     {
-        private Dictionary<MethodType, LinkedList<Component>> m_components = new Dictionary<MethodType, LinkedList<Component>>();
+        private readonly List<Component>[] _components;
 
-        internal IEnumerable<Component> GetTargetsFor(MethodType methodType)
+        public ComponentCallRegistry()
         {
-            if (!m_components.ContainsKey(methodType))
-            {
-                m_components[methodType] = new LinkedList<Component>();
-            }
-            return m_components[methodType];
+            var count = Enum.GetValues<MethodType>().Length;
+            _components = new List<Component>[count];
+
+            for (int i = 0; i < count; i++)
+                _components[i] = new List<Component>(40);
         }
 
-        internal void Register(Component newComponent, MethodType init)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal List<Component> GetTargetsFor(MethodType type)
         {
-            if (!m_components.ContainsKey(init))
-            {
-                m_components[init] = new LinkedList<Component>();
-            }
-            if (m_components[init].Contains(newComponent)) return;
-            m_components[init].AddLast(newComponent);
+            return _components[(int)type];
         }
 
-        internal void Unregister(Component component, MethodType update)
+        internal void Register(Component component, MethodType type)
         {
-            if (m_components.ContainsKey(update))
-            {
-                m_components[update].Remove(component);
-            }
+            var list = _components[(int)type];
+
+            if (!list.Contains(component))
+                list.Add(component);
         }
 
-        internal void Clear(MethodType init)
+        internal void Unregister(Component component, MethodType type)
         {
-            if (m_components.ContainsKey(init))
-            {
-                m_components[init].Clear();
-            }
+            _components[(int)type].Remove(component);
+        }
+
+        internal void Clear(MethodType type)
+        {
+            _components[(int)type].Clear();
         }
     }
 }
