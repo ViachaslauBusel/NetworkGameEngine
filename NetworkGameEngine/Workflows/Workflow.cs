@@ -45,6 +45,7 @@ namespace NetworkGameEngine
         {
             m_world = world;
             m_thread = new Thread(ThreadLoop);
+            m_thread.Priority = ThreadPriority.AboveNormal;
             m_thread.Start();
             m_threadId = m_thread.ManagedThreadId;
         }
