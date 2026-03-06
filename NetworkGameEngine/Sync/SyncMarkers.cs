@@ -2,8 +2,11 @@
 {
     public class SyncMarkers
     {
+        private PriorityEvent _onDirty = new PriorityEvent();
         private Dictionary<SyncMarkerType, bool> _markers = new();
         private bool _isDirty = false;
+
+        public PriorityEvent OnMarkedDirty => _onDirty;
 
         public SyncMarkers()
         {
@@ -40,6 +43,7 @@
             {
                 _markers[marker.Key] = true;
             }
+            _onDirty.Invoke();
         }
 
         public virtual void MarkAsClean(SyncMarkerType local)

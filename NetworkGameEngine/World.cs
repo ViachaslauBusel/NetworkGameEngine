@@ -26,8 +26,8 @@ namespace NetworkGameEngine
         private List<AddingObjectTask> m_addedObjectTasks = new List<AddingObjectTask>();
         private ConcurrentQueue<RemovingObjectTask> m_removeObjects = new ConcurrentQueue<RemovingObjectTask>();
         private List<GameObject> m_removedObjects = new List<GameObject>();
-        private List<IUpdatableService> _updatableServices = new List<IUpdatableService>();
-        private List<IThreadAwareUpdatableService> _threadAwareUpdatableServices = new List<IThreadAwareUpdatableService>();
+        private List<IMainThreadUpdatableService> _updatableServices = new List<IMainThreadUpdatableService>();
+        private List<IMultiThreadUpdatableService> _threadAwareUpdatableServices = new List<IMultiThreadUpdatableService>();
         private Dictionary<Type, List<MethodInfo>> m_injectMethodsCache = new Dictionary<Type, List<MethodInfo>>();
         private uint m_generatorID = 1;
         private WorkflowPool m_workflows;
@@ -78,6 +78,20 @@ namespace NetworkGameEngine
             return default;
         }
 
+        private T[] ResolveAll<T>()
+        {
+            var result = new List<T>();
+
+            foreach (var container in m_containers)
+            {
+                // Для IEnumerable<T> Autofac безопасно возвращает пустую коллекцию,
+                // если регистраций нет.
+                result.AddRange(container.Resolve<IEnumerable<T>>());
+            }
+
+            return result.ToArray();
+        }
+
         public void InjectDependenciesIntoObject(Object component)
         {
             lock (m_injectMethodsCache)
@@ -124,13 +138,17 @@ namespace NetworkGameEngine
             var builder = new ContainerBuilder();
             builder.RegisterInstance(m_time).AsSelf().SingleInstance();
             builder.RegisterInstance(this).AsSelf().SingleInstance();
+            builder.RegisterType<MainThreadDelayDispatcher>().AsSelf().As<IMainThreadUpdatableService>()
+                                                                      .As<IMultiThreadUpdatableService>().SingleInstance();
+            builder.RegisterType<TimedTaskScheduler>().FindConstructorsWith(type => type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                                                      .AsSelf().InstancePerDependency();
             m_containers.Add(builder.Build());
 
             m_workflows.Init(maxThread);
 
 
-            _updatableServices.AddRange(Resolve<IUpdatableService[]>());
-            _threadAwareUpdatableServices.AddRange(Resolve<IThreadAwareUpdatableService[]>());
+            _updatableServices.AddRange(ResolveAll<IMainThreadUpdatableService>());
+            _threadAwareUpdatableServices.AddRange(ResolveAll<IMultiThreadUpdatableService>());
             m_isWorking = true;
             Thread th = new Thread(WorldThread);
             th.IsBackground = true;
@@ -247,7 +265,16 @@ namespace NetworkGameEngine
             _executuinProfiler?.StartMethodProfiling(MethodType.MultiThreadService);
             foreach (var service in _threadAwareUpdatableServices)
             {
-                for (int i = 0; i < m_workflows.Count; i++) { m_workflows.GetWorkflowByIndex(i).Execute(() => service.Update(i, m_workflows.Count)); }
+                int totalThreads = m_workflows.Count;
+
+                for (int i = 0; i < totalThreads; i++)
+                {
+                    int threadIndex = i;
+                    m_workflows
+                        .GetWorkflowByIndex(threadIndex)
+                        .Execute(() => service.Update(threadIndex, totalThreads));
+                }
+
                 foreach (var th in m_workflows.AllWorkflows) { th.Wait(); }
             }
 

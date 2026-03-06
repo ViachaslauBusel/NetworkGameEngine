@@ -21,18 +21,14 @@ namespace NetworkGameEngine
         }
 
         private readonly object m_lock = new object();
-        private readonly GameObject m_ownerGameObject;
+        //private readonly GameObject m_ownerGameObject;
         private readonly SortedList<int, List<SubscriptionEntry>> m_subscriptionsByPriority =
             new SortedList<int, List<SubscriptionEntry>>(Comparer<int>.Default);
         private List<SubscriptionEntry> m_snapshot = new List<SubscriptionEntry>(15);
         private bool m_isDirty = false;
 
-
-        protected GameObject OwnerObject => m_ownerGameObject;
-
         protected PriorityEventBase()
         {
-            m_ownerGameObject = GlobalWorkflowRegistry.GetCurrentWorkflow()?.CurrentGameObject;
         }
 
         // ----------------------------------------------------------------------
@@ -81,9 +77,9 @@ namespace NetworkGameEngine
             {
                 if (!m_isDirty)
                     return m_snapshot;
-                int total = 0;
-                foreach (var kv in m_subscriptionsByPriority)
-                    total += kv.Value.Count;
+                //int total = 0;
+                //foreach (var kv in m_subscriptionsByPriority)
+                //    total += kv.Value.Count;
 
                 m_snapshot.Clear();
 
@@ -101,7 +97,9 @@ namespace NetworkGameEngine
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void InternalInvoke(in SubscriptionEntry entry, Action call)
         {
-            if (entry.Owner != null && entry.Owner != m_ownerGameObject)
+            GameObject ownerGameObject = GlobalWorkflowRegistry.GetCurrentWorkflow()?.CurrentGameObject;
+
+            if (entry.Owner != null && entry.Owner != ownerGameObject)
             {
                 entry.Owner.SendCommand(new ExecuteActionCommand(call));
             }
