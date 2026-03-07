@@ -6,17 +6,19 @@
         private List<GameObject> m_cachedList = new List<GameObject>();
         private object m_lockObject = new object();
 
-        internal IEnumerable<GameObject> GetTargetsFor(MethodType methodType)
+        internal List<GameObject> GetTargetsFor(MethodType methodType)
         {
             lock (m_lockObject)
             {
                 m_cachedList.Clear();
-                if (!m_methodObjects.ContainsKey(methodType))
+
+                if (!m_methodObjects.TryGetValue(methodType, out var objects) || objects.Count == 0)
                 {
                     return m_cachedList;
                 }
-               
-                m_cachedList.AddRange(m_methodObjects[methodType]);
+
+                //m_cachedList.EnsureCapacity(objects.Count);
+                m_cachedList.AddRange(objects);
                 return m_cachedList;
             }
         }

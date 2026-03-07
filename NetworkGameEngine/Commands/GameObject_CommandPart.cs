@@ -218,7 +218,7 @@ namespace NetworkGameEngine
             {
                 if (m_commands.IsEmpty && m_commandsWithResult.IsEmpty)
                 {
-                    m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.DispatchCommands);
+                    m_objectCallRegistry.Unregister(this, MethodType.DispatchCommands);
                 }
             }
         }
@@ -229,7 +229,7 @@ namespace NetworkGameEngine
             m_commands.Enqueue(new CommandContainer<T>(command));
             lock (m_cmdLockObject)
             {
-                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.DispatchCommands);
+                m_objectCallRegistry.Register(this, MethodType.DispatchCommands);
             }
         }
 
@@ -240,7 +240,7 @@ namespace NetworkGameEngine
 
             lock (m_cmdLockObject)
             {
-                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.DispatchCommands);
+                m_objectCallRegistry.Register(this, MethodType.DispatchCommands);
             }
 
             long endWaitTime = Time.Milliseconds + waitTime;

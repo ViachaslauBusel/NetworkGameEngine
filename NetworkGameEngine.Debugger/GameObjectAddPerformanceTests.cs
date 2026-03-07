@@ -111,6 +111,7 @@ namespace NetworkGameEngine.UnitTests
                 _componentE = GetComponent<ComponentE>();
             }
         }
+
         [Test]
         public async Task AddGameObjects_Performance()
         {

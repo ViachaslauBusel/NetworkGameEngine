@@ -1,7 +1,4 @@
-﻿using Autofac;
-using NetworkGameEngine.DependencyInjection;
-using NetworkGameEngine.Signals.Components;
-using System.Reflection;
+﻿using NetworkGameEngine.Signals.Components;
 
 namespace NetworkGameEngine
 {
@@ -12,6 +9,7 @@ namespace NetworkGameEngine
         private bool m_isDestroyed = false;
         private bool m_isActive = false;
         private World m_world;
+        private GameObjectCallRegistry m_objectCallRegistry;
 
         public string Name => m_name;
         public uint ID { get; private set; }
@@ -59,6 +57,7 @@ namespace NetworkGameEngine
             ID = objectID;
             m_threadID = threadID;
             m_world = world;
+            m_objectCallRegistry = m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry;
             m_isActive = true;
         }
 

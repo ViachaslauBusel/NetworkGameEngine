@@ -12,11 +12,11 @@ namespace NetworkGameEngine
         private ConcurrentQueue<Component> m_incomingComponents = new ConcurrentQueue<Component>();
         private ConcurrentBag<Type> m_outgoingComponents = new ConcurrentBag<Type>();
         private Dictionary<Type, Component> m_components = new ();
-        private ComponentCallRegistry m_methodComponents = new ();
+        private ComponentCallRegistry m_componentsCallRegistry = new ();
 
         internal bool HasIncomingComponents => !m_incomingComponents.IsEmpty;
-        internal bool HasUpdateComponents => m_methodComponents.GetTargetsFor(MethodType.UpdateComponent).Any();
-        internal bool HasLateUpdateComponents => m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent).Any();
+        internal bool HasUpdateComponents => m_componentsCallRegistry.GetTargetsFor(MethodType.UpdateComponent).Any();
+        internal bool HasLateUpdateComponents => m_componentsCallRegistry.GetTargetsFor(MethodType.LateUpdateComponent).Any();
 
         public async Job<bool> AddComponentAsync<T>() where T : Component, new()
         {
@@ -41,7 +41,7 @@ namespace NetworkGameEngine
             lock (m_incomingComponents)
             {
                 m_incomingComponents.Enqueue(component);
-                m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.PrepareComponent);
+                m_objectCallRegistry?.Register(this, MethodType.PrepareComponent);
             }
         }
 
@@ -86,7 +86,7 @@ namespace NetworkGameEngine
             m_outgoingComponents.Add(typeof(T));
             lock (m_outgoingComponents)
             {
-                m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDestroyComponent);
+                m_objectCallRegistry?.Register(this, MethodType.OnDestroyComponent);
             }
         }
 
@@ -95,36 +95,37 @@ namespace NetworkGameEngine
             m_outgoingComponents.Add(component.GetType());
             lock (m_outgoingComponents)
             {
-                m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDestroyComponent);
+                m_objectCallRegistry?.Register(this, MethodType.OnDestroyComponent);
             }
         }
 
         internal void RegisterCallMethodsForComponent(Component component, MethodType methodType)
         {
-            m_methodComponents.Register(component, methodType);
-            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, methodType);
+            m_componentsCallRegistry.Register(component, methodType);
+            m_objectCallRegistry.Register(this, methodType);
         }
 
         internal void PrepareIncomingComponents()
         {
             while (m_incomingComponents.TryDequeue(out Component newComponent))
             {
-                newComponent.InternalInit(this);
-                if (m_components.ContainsKey(newComponent.GetType()))
+                Type componentType = newComponent.GetType();
+                if (m_components.ContainsKey(componentType))
                 {
                     newComponent.InternalSetError();
                     continue;
                 }
-                m_components.Add(newComponent.GetType(), newComponent);
-                m_methodComponents.Register(newComponent, MethodType.InitComponent);
+                newComponent.InternalInit(this);
+                m_components.Add(componentType, newComponent);
+                m_componentsCallRegistry.Register(newComponent, MethodType.InitComponent);
             }
 
             //Register command listener
-            var componentsToInit = m_methodComponents.GetTargetsFor(MethodType.InitComponent);
-            int count = componentsToInit.Count;
-            for (int i = 0; i < count; i++)
+            var componentsToInit = m_componentsCallRegistry.GetTargetsFor(MethodType.InitComponent);
+            var span = CollectionsMarshal.AsSpan(componentsToInit);
+            for (int i = 0; i < span.Length; i++)
             {
-                var c = componentsToInit[i];
+                var c = span[i];
                 RegisterCommandListenersForComponent(c);
                 InjectDependenciesIntoObject(c);
             }
@@ -133,16 +134,16 @@ namespace NetworkGameEngine
             {
                 if (m_incomingComponents.Count == 0)
                 {
-                    m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.PrepareComponent);
+                    m_objectCallRegistry.Unregister(this, MethodType.PrepareComponent);
                 }
             }
-            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.InitComponent);
+            m_objectCallRegistry.Register(this, MethodType.InitComponent);
         }
 
 
         internal void CallInitComponents()
         {
-            var componentsToInit = m_methodComponents.GetTargetsFor(MethodType.InitComponent);
+            var componentsToInit = m_componentsCallRegistry.GetTargetsFor(MethodType.InitComponent);
             var span = CollectionsMarshal.AsSpan(componentsToInit);
             for (int i = 0; i < span.Length; i++)
             {
@@ -150,11 +151,11 @@ namespace NetworkGameEngine
                 InitComponentSafe(c);
                 if (IsActive && c.Enabled)
                 {
-                    m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnEnableComponent);
+                    m_objectCallRegistry.Register(this, MethodType.OnEnableComponent);
                 }
             }
-            m_methodComponents.Clear(MethodType.InitComponent);
-            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.InitComponent);
+            m_componentsCallRegistry.Clear(MethodType.InitComponent);
+            m_objectCallRegistry.Unregister(this, MethodType.InitComponent);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -212,7 +213,7 @@ namespace NetworkGameEngine
         /// </summary>
         internal void CallOnStartComponents()
         {
-            var componentsToStart = m_methodComponents.GetTargetsFor(MethodType.StartComponent);
+            var componentsToStart = m_componentsCallRegistry.GetTargetsFor(MethodType.StartComponent);
             var span = CollectionsMarshal.AsSpan(componentsToStart);
             for (int i = 0; i < span.Length; i++)
             {
@@ -222,7 +223,7 @@ namespace NetworkGameEngine
                 StartComponentSafe(c);
                 c.SetStarted();
             }
-            m_methodComponents.Clear(MethodType.StartComponent);
+            m_componentsCallRegistry.Clear(MethodType.StartComponent);
             m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.StartComponent);
         }
 
@@ -242,8 +243,8 @@ namespace NetworkGameEngine
         internal void CallOnUpdateComponents()
         {
             if (!m_isActive) return;
-
-            var components = m_methodComponents.GetTargetsFor(MethodType.UpdateComponent);
+            //Stopwatch sw = Stopwatch.StartNew();
+            var components = m_componentsCallRegistry.GetTargetsFor(MethodType.UpdateComponent);
             var span = CollectionsMarshal.AsSpan(components);
             for (int i = 0; i < span.Length; i++)
             {
@@ -252,7 +253,11 @@ namespace NetworkGameEngine
                 if (!component.Enabled)
                     continue;
 
+                //sw.Restart();
                 UpdateComponentSafe(component);
+                //sw.Stop();
+                //if (sw.ElapsedMilliseconds > 10) // Логируем, если обработка одного объекта занимает слишком много времени
+                //    m_world.LogError($"Processing of method {component.GetType().Name} took {sw.ElapsedMilliseconds} ms");
             }
         }
 
@@ -273,7 +278,7 @@ namespace NetworkGameEngine
         internal void CallOnLateUpdateComponents()
         {
             if (!m_isActive) return;
-            var components = m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent);
+            var components = m_componentsCallRegistry.GetTargetsFor(MethodType.LateUpdateComponent);
             var span = CollectionsMarshal.AsSpan(components);
             for (int i = 0; i < span.Length; i++)
             {
@@ -318,16 +323,16 @@ namespace NetworkGameEngine
                 component.SetDisabled();
                 if (component.HasUpdateOverride)
                 {
-                    m_methodComponents.Unregister(component, MethodType.UpdateComponent);
-                    if (m_methodComponents.GetTargetsFor(MethodType.UpdateComponent).Count == 0)
+                    m_componentsCallRegistry.Unregister(component, MethodType.UpdateComponent);
+                    if (m_componentsCallRegistry.GetTargetsFor(MethodType.UpdateComponent).Count == 0)
                     {
                         m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.UpdateComponent);
                     }
                 }
                 if (component.HasLateUpdateOverride)
                 {
-                    m_methodComponents.Unregister(component, MethodType.LateUpdateComponent);
-                    if (m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent).Count == 0)
+                    m_componentsCallRegistry.Unregister(component, MethodType.LateUpdateComponent);
+                    if (m_componentsCallRegistry.GetTargetsFor(MethodType.LateUpdateComponent).Count == 0)
                     {
                         m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.LateUpdateComponent);
                     }
@@ -352,7 +357,7 @@ namespace NetworkGameEngine
                     {
                         m_world.LogError($"Exception in OnDisable of component {component.GetType().Name} on GameObject {Name} (ID: {ID}): {ex}");
                     }
-                    m_methodComponents.Register(component, MethodType.OnDestroyComponent);
+                    m_componentsCallRegistry.Register(component, MethodType.OnDestroyComponent);
                 }
                 //Удаляем компоненты которые еще не были добавлены
                 lock (m_incomingComponents)
@@ -380,7 +385,7 @@ namespace NetworkGameEngine
             }
 
           
-            var componentsToDestroy = m_methodComponents.GetTargetsFor(MethodType.OnDestroyComponent);
+            var componentsToDestroy = m_componentsCallRegistry.GetTargetsFor(MethodType.OnDestroyComponent);
             int count = componentsToDestroy.Count;
             for (int i = 0; i < count; i++)
             {
@@ -400,22 +405,22 @@ namespace NetworkGameEngine
 
                 if (component.HasUpdateOverride)
                 {
-                    m_methodComponents.Unregister(component, MethodType.UpdateComponent);
-                    if (m_methodComponents.GetTargetsFor(MethodType.UpdateComponent).Count() == 0)
+                    m_componentsCallRegistry.Unregister(component, MethodType.UpdateComponent);
+                    if (m_componentsCallRegistry.GetTargetsFor(MethodType.UpdateComponent).Count() == 0)
                     {
                         m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.UpdateComponent);
                     }
                 }
                 if (component.HasLateUpdateOverride)
                 {
-                    m_methodComponents.Unregister(component, MethodType.LateUpdateComponent);
-                    if (m_methodComponents.GetTargetsFor(MethodType.LateUpdateComponent).Count() == 0)
+                    m_componentsCallRegistry.Unregister(component, MethodType.LateUpdateComponent);
+                    if (m_componentsCallRegistry.GetTargetsFor(MethodType.LateUpdateComponent).Count() == 0)
                     {
                         m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.LateUpdateComponent);
                     }
                 }
             }
-            m_methodComponents.Clear(MethodType.OnDestroyComponent);
+            m_componentsCallRegistry.Clear(MethodType.OnDestroyComponent);
 
             lock (m_outgoingComponents)
             {

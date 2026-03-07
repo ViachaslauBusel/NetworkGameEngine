@@ -12,7 +12,7 @@ namespace NetworkGameEngine.Components
             _components = new List<Component>[count];
 
             for (int i = 0; i < count; i++)
-                _components[i] = new List<Component>(40);
+                _components[i] = new List<Component>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -24,9 +24,15 @@ namespace NetworkGameEngine.Components
         internal void Register(Component component, MethodType type)
         {
             var list = _components[(int)type];
+            var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(list);
 
-            if (!list.Contains(component))
-                list.Add(component);
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (ReferenceEquals(span[i], component))
+                    return;
+            }
+
+            list.Add(component);
         }
 
         internal void Unregister(Component component, MethodType type)
