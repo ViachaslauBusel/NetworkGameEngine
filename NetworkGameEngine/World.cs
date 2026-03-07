@@ -177,6 +177,7 @@ namespace NetworkGameEngine
                         Console.Title = $"NetworkGameEngine | Tick: {m_time.CalculateTimeFromTick()} ms | Objects: {m_objects.Count}";
                         int sleepTime = m_time.CalculateSleepTime();
                         if(sleepTime > 0) Thread.Sleep(sleepTime);
+                        else LogError($"Frame is taking too long! Time from tick: {m_time.CalculateTimeFromTick()} ms");
                     }
                 } 
                 catch(Exception ex)
@@ -202,7 +203,7 @@ namespace NetworkGameEngine
 
         internal void Update()
         {
-            int addObjectsCount = Math.Min(400, m_addObjects.Count);
+            int addObjectsCount = Math.Min(200, m_addObjects.Count);
             for (int i = 0; i < addObjectsCount && m_addObjects.TryDequeue(out var task); i++)
             {
                 GameObject obj = task.GameObject;
@@ -263,19 +264,10 @@ namespace NetworkGameEngine
             _executuinProfiler?.StopMethodProfiling(MethodType.OneThreadService);
 
             _executuinProfiler?.StartMethodProfiling(MethodType.MultiThreadService);
+
             foreach (var service in _threadAwareUpdatableServices)
             {
-                int totalThreads = m_workflows.Count;
-
-                for (int i = 0; i < totalThreads; i++)
-                {
-                    int threadIndex = i;
-                    m_workflows
-                        .GetWorkflowByIndex(threadIndex)
-                        .Execute(() => service.Update(threadIndex, totalThreads));
-                }
-
-                foreach (var th in m_workflows.AllWorkflows) { th.Wait(); }
+                m_workflows.RunMultiThreadService(service);
             }
 
             if (m_addedObjectTasks.Count > 0)
@@ -293,8 +285,7 @@ namespace NetworkGameEngine
         private void ExecuteMethod(MethodType method)
         {
             _executuinProfiler?.StartMethodProfiling(method);
-            foreach (var th in m_workflows.AllWorkflows) { th.CallMethod(method); }
-            foreach (var th in m_workflows.AllWorkflows) { th.Wait(); }
+            m_workflows.CallMethod(method);
             _executuinProfiler?.StopMethodProfiling(method);
         }
 

@@ -1,4 +1,6 @@
 ﻿using NetworkGameEngine.JobsSystem;
+using NetworkGameEngine.Workflows;
+using System.Runtime.InteropServices;
 
 namespace NetworkGameEngine
 {
@@ -18,36 +20,70 @@ namespace NetworkGameEngine
         UpdateModels,
         DispatchCommands,
         JobExecutor,
-        ActionExecuter,
         OneThreadService,
         MultiThreadService
     }
-    internal class Workflow
+    internal sealed class Workflow
     {
-        private World m_world;
-        private Thread m_thread;
-        private int m_threadId;
-        private Object m_locker = new object();
-        private List<GameObject> m_objects = new List<GameObject>();
-        private GameObjectCallRegistry _callRegistry = new GameObjectCallRegistry();
-        private Action _action;
-        private volatile MethodType m_currentMethod = MethodType.None;
-        private ThreadJobExecutor m_jobExcecutor;
-        // Текущий GameObject, обрабатываемый в этом потоке
-        private GameObject m_currentObject;
+        private readonly Dictionary<MethodType, Action> m_directHandlersByMethod;
+        private readonly Dictionary<MethodType, Action<GameObject>> m_gameObjectHandlersByMethod;
+        private readonly List<GameObject> m_registeredObjects = new List<GameObject>();
+        private readonly GameObjectCallRegistry m_callRegistry = new GameObjectCallRegistry();
+        private readonly WorkflowPool m_workflowPool;
+        private readonly ManualResetEventSlim m_startEvent;
+        private readonly SemaphoreSlim m_dispatchSignal;
+        private readonly CountdownEvent m_barrier;
 
-        public GameObject CurrentGameObject => m_currentObject;
-        public bool IsFree => m_currentMethod == MethodType.None;
-        public int ThreadID => m_threadId;
-        internal GameObjectCallRegistry CallRegistry => _callRegistry;
+        private World m_world;
+        private Thread m_workerThread;
+        private int m_workerThreadId;
+        private int m_workerThreadIndex;
+        private ThreadJobExecutor m_jobExecutor;
+        // Текущий GameObject, обрабатываемый в этом потоке
+        private GameObject m_currentGameObject;
+        private int m_lastProcessedDispatchVersion;
+
+        public GameObject CurrentGameObject => m_currentGameObject;
+        public int ThreadID => m_workerThreadId;
+        internal GameObjectCallRegistry CallRegistry => m_callRegistry;
+
+        public Workflow(WorkflowPool workflowPool, SemaphoreSlim dispatchSignal, CountdownEvent barrier, int threadIndex)
+        {
+            m_workflowPool = workflowPool;
+            m_dispatchSignal = dispatchSignal;
+            m_barrier = barrier;
+            m_workerThreadIndex = threadIndex;
+            m_directHandlersByMethod = new Dictionary<MethodType, Action>
+            {
+                [MethodType.JobExecutor] = () => m_jobExecutor.Update(),
+                [MethodType.MultiThreadService] = () => m_workflowPool.CurrentMultiThreadService?.Update(m_workerThreadIndex, m_workflowPool.Count)
+            };
+
+            m_gameObjectHandlersByMethod = new()
+            {
+                { MethodType.PrepareComponent, o => o.PrepareIncomingComponents() },
+                { MethodType.PrepareModel, o => o.PrepareIncomingModels() },
+                { MethodType.InitComponent, o => o.CallInitComponents() },
+                { MethodType.OnAttachModel, o => o.CallOnAttachModels() },
+                { MethodType.OnEnableComponent, o => o.CallOnEnableComponents() },
+                { MethodType.StartComponent, o => o.CallOnStartComponents() },
+                { MethodType.UpdateComponent, o => o.CallOnUpdateComponents() },
+                { MethodType.LateUpdateComponent, o => o.CallOnLateUpdateComponents() },
+                { MethodType.DispatchCommands, o => o.DispatchPendingCommands() },
+                { MethodType.UpdateModels, o => o.CallUpdateModels() },
+                { MethodType.OnDisableComponent, o => o.CallOnDisableComponents() },
+                { MethodType.OnDetachModel, o => o.CallOnDetachModels() },
+                { MethodType.OnDestroyComponent, o => o.CallOnDestroyComponents() }
+            };
+        }
 
         public void Init(World world)
         {
             m_world = world;
-            m_thread = new Thread(ThreadLoop);
-            m_thread.Priority = ThreadPriority.AboveNormal;
-            m_thread.Start();
-            m_threadId = m_thread.ManagedThreadId;
+            m_workerThread = new Thread(ThreadLoop);
+            m_workerThread.Priority = ThreadPriority.AboveNormal;
+            m_workerThread.Start();
+            m_workerThreadId = m_workerThread.ManagedThreadId;
         }
 
         private void InitThread()
@@ -56,192 +92,68 @@ namespace NetworkGameEngine
             System.Threading.SynchronizationContext.SetSynchronizationContext(
                 new NetworkGameEngine.JobsSystem.EngineSynchronizationContext(m_world));
 
-            m_jobExcecutor = JobsManager.RegisterThreadHandler(m_world, this);
+            m_jobExecutor = JobsManager.RegisterThreadHandler(m_world, this);
         }
 
         internal void AddObject(GameObject obj)
         {
-            m_objects.Add(obj);
+            m_registeredObjects.Add(obj);
             if (obj.HasIncomingComponents)
-                _callRegistry.Register(obj, MethodType.PrepareComponent);
+                m_callRegistry.Register(obj, MethodType.PrepareComponent);
             if (obj.HasIncomingModels)
-                _callRegistry.Register(obj, MethodType.PrepareModel);
-        }
-
-        internal void CallMethod(MethodType method)
-        {
-            lock (m_locker)
-            {
-                if(m_currentMethod != MethodType.None) throw new Exception("invalid object processing state");
-                m_currentMethod = method;
-                Monitor.PulseAll(m_locker);
-            }
-        }
-
-        internal void Execute(Action action)
-        {
-            lock (m_locker)
-            {
-                if (m_currentMethod != MethodType.None) throw new Exception("invalid object processing state");
-                _action = action;
-                m_currentMethod = MethodType.ActionExecuter;
-                Monitor.PulseAll(m_locker);
-            }
+                m_callRegistry.Register(obj, MethodType.PrepareModel);
         }
 
         internal void RemoveObject(GameObject removeObj)
         {
-            m_objects.Remove(removeObj);
-        }
-
-        internal void Wait()
-        {
-            lock (m_locker)
-            {
-                while (m_currentMethod != MethodType.None) { Monitor.Wait(m_locker); }
-            }
+            m_registeredObjects.Remove(removeObj);
         }
 
         private void ThreadLoop()
         {
             InitThread();
-            lock (m_locker)
-            {
-                while (true)
-                {
-                    Monitor.Wait(m_locker);
 
-                    while (m_currentMethod != MethodType.None)
-                    {
-                        try
-                        {
-                            switch (m_currentMethod)
-                            {
-                                case MethodType.PrepareComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.PrepareComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.PrepareIncomingComponents();
-                                    }
-                                    break;
-                                    case MethodType.PrepareModel:
-                                        foreach (var obj in _callRegistry.GetTargetsFor(MethodType.PrepareModel))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.PrepareIncomingModels();
-                                    }
-                                        break;
-                                case MethodType.InitComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.InitComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallInitComponents();
-                                    }
-                                    break;
-                                    case MethodType.OnAttachModel:
-                                        foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnAttachModel))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnAttachModels();  
-                                    }
-                                        break;
-                                case MethodType.OnEnableComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnEnableComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnEnableComponents();
-                                    }
-                                    break;
-                                case MethodType.StartComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.StartComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnStartComponents();
-                                    }
-                                    break;
-                                case MethodType.UpdateComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.UpdateComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnUpdateComponents();
-                                    }
-                                    break;
-                                case MethodType.DispatchCommands:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.DispatchCommands))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.DispatchPendingCommands();
-                                    }
-                                    break;
-                                case MethodType.JobExecutor:
-                                    m_jobExcecutor.Update();
-                                    break;
-                                case MethodType.LateUpdateComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.LateUpdateComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnLateUpdateComponents();
-                                    }
-                                    break;
-            
-                                case MethodType.OnDisableComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnDisableComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnDisableComponents();
-                                    }
-                                    break;
-                                case MethodType.OnDetachModel:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnDetachModel))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnDetachModels(); 
-                                    }
-                                    break;
-                                case MethodType.OnDestroyComponent:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.OnDestroyComponent))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallOnDestroyComponents();
-                                    }
-                                    break;
-                                case MethodType.UpdateModels:
-                                    foreach (var obj in _callRegistry.GetTargetsFor(MethodType.UpdateModels))
-                                    {
-                                        m_currentObject = obj;
-                                        m_currentObject.CallUpdateModels();
-                                    }
-                                    break;
-                                case MethodType.ActionExecuter:
-                                    try
-                                    {
-                                        _action?.Invoke();
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        m_world.LogError($"Error in Workflow ActionExecuter: {e.Message}");
-                                    }
-                                    break;
-                                default:
-                                    throw new Exception("invalid object processing state");
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            m_world.LogError($"Fatal Error in method {m_currentMethod} of Workflow: {e.Message}");
-                            continue;
-                        }
-                        m_currentMethod = MethodType.None;
-                        m_currentObject = null;
-                    }
-                    Monitor.PulseAll(m_locker);
+            while (true)
+            {
+                m_dispatchSignal.Wait();
+
+                try
+                {
+                    ExecuteMethod(m_workflowPool.ScheduledMethod);
                 }
+                catch (Exception exception)
+                {
+                    m_world.LogError($"Fatal Error in method {m_workflowPool.ScheduledMethod} of Workflow: {exception}");
+                }
+                finally
+                {
+                    m_barrier.Signal();
+                }
+            }
+        }
+
+        private void ExecuteMethod(MethodType method)
+        {
+            if (m_gameObjectHandlersByMethod.TryGetValue(method, out var handler))
+            {
+                var targets = m_callRegistry.GetTargetsFor(method);
+                var span = CollectionsMarshal.AsSpan(targets);
+
+                for (int i = 0; i < span.Length; i++)
+                {
+                    m_currentGameObject = span[i];
+                    handler(m_currentGameObject);
+                }
+            }
+            else if (m_directHandlersByMethod.TryGetValue(method, out var directHandler))
+            {
+                directHandler();
             }
         }
 
         internal void SetCurrentGameObject(GameObject owner)
         {
-            m_currentObject = owner;
+            m_currentGameObject = owner;
         }
     }
 }

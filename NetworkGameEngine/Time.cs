@@ -4,7 +4,6 @@
     {
         private int m_tick = 0;
         private long m_startTickTime;
-        private long m_lastTickTime;
         private int m_deltaTime;
         public readonly long FixedDeltaTimeMillis = 100;
         public readonly float FixedDeltaTimeSeconds = 0.1f;
@@ -18,20 +17,18 @@
             FixedDeltaTimeMillis = tickInterval;
             FixedDeltaTimeSeconds = tickInterval / 1000f;
             m_startTickTime = Milliseconds;
-            m_lastTickTime = Milliseconds;
         }
 
         internal void NextTick()
         {
             m_tick++;
+            m_deltaTime = CalculateTimeFromTick();
             m_startTickTime = Milliseconds;
-            m_deltaTime = (int)(m_startTickTime - m_lastTickTime);
-            m_lastTickTime = m_startTickTime;
         }
 
         internal int CalculateSleepTime()
         {
-            return (int)(FixedDeltaTimeMillis - (Milliseconds - m_startTickTime));
+            return (int)(FixedDeltaTimeMillis - CalculateTimeFromTick());
         }
 
         internal int CalculateTimeFromTick()
