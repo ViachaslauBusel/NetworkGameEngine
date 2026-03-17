@@ -31,7 +31,6 @@ namespace NetworkGameEngine
         private readonly GameObjectCallRegistry m_callRegistry = new GameObjectCallRegistry();
         private readonly WorkflowPool m_workflowPool;
         private readonly ManualResetEventSlim m_startEvent;
-        private readonly SemaphoreSlim m_dispatchSignal;
         private readonly CountdownEvent m_barrier;
 
         private World m_world;
@@ -41,22 +40,32 @@ namespace NetworkGameEngine
         private ThreadJobExecutor m_jobExecutor;
         // Текущий GameObject, обрабатываемый в этом потоке
         private GameObject m_currentGameObject;
-        private int m_lastProcessedDispatchVersion;
 
         public GameObject CurrentGameObject => m_currentGameObject;
         public int ThreadID => m_workerThreadId;
         internal GameObjectCallRegistry CallRegistry => m_callRegistry;
 
-        public Workflow(WorkflowPool workflowPool, SemaphoreSlim dispatchSignal, CountdownEvent barrier, int threadIndex)
+        public Workflow(WorkflowPool workflowPool, CountdownEvent barrier, int threadIndex)
         {
             m_workflowPool = workflowPool;
-            m_dispatchSignal = dispatchSignal;
             m_barrier = barrier;
             m_workerThreadIndex = threadIndex;
+            m_startEvent = new ManualResetEventSlim(false);
+
             m_directHandlersByMethod = new Dictionary<MethodType, Action>
             {
                 [MethodType.JobExecutor] = () => m_jobExecutor.Update(),
-                [MethodType.MultiThreadService] = () => m_workflowPool.CurrentMultiThreadService?.Update(m_workerThreadIndex, m_workflowPool.Count)
+                [MethodType.MultiThreadService] = () =>
+                {
+                    try
+                    {
+                        m_workflowPool.CurrentMultiThreadService?.Update(m_workerThreadIndex, m_workflowPool.Count);
+                    }
+                    catch (Exception ex)
+                    {
+                        m_world.LogError($"Exception in MultiThreadService Update: {ex}");
+                    }
+                }
             };
 
             m_gameObjectHandlersByMethod = new()
@@ -109,13 +118,19 @@ namespace NetworkGameEngine
             m_registeredObjects.Remove(removeObj);
         }
 
+        internal void DispatchOnce()
+        {
+            m_startEvent.Set();
+        }
+
         private void ThreadLoop()
         {
             InitThread();
 
             while (true)
             {
-                m_dispatchSignal.Wait();
+                m_startEvent.Wait();
+                m_startEvent.Reset();
 
                 try
                 {

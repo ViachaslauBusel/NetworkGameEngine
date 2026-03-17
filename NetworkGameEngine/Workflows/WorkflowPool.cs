@@ -6,10 +6,9 @@ namespace NetworkGameEngine.Workflows
     {
         private readonly World m_world;
         private Workflow[] m_workflowArray;
-        private readonly SemaphoreSlim m_dispatchSignal = new(0);
         private CountdownEvent m_barrier;
-        private MethodType m_scheduledMethod;
-        private IMultiThreadUpdatableService m_currentMultiThreadService;
+        private volatile MethodType m_scheduledMethod;
+        private volatile IMultiThreadUpdatableService m_currentMultiThreadService;
 
         public int Count => m_workflowArray.Length;
         public MethodType ScheduledMethod => m_scheduledMethod;
@@ -28,7 +27,7 @@ namespace NetworkGameEngine.Workflows
 
             for (int i = 0; i < m_workflowArray.Length; i++)
             {
-                m_workflowArray[i] = new Workflow(this, m_dispatchSignal, m_barrier, i);
+                m_workflowArray[i] = new Workflow(this, m_barrier, i);
                 m_workflowArray[i].Init(m_world);
                 GlobalWorkflowRegistry.RegisterWorkflow(m_workflowArray[i]);
             }
@@ -39,7 +38,11 @@ namespace NetworkGameEngine.Workflows
             m_scheduledMethod = method;
             m_barrier.Reset(m_workflowArray.Length);
 
-            m_dispatchSignal.Release(m_workflowArray.Length); // ровно по одному тикету на worker
+            for (int i = 0; i < m_workflowArray.Length; i++)
+            {
+                m_workflowArray[i].DispatchOnce();
+            }
+
             m_barrier.Wait();
 
             m_scheduledMethod = MethodType.None;
