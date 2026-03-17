@@ -182,7 +182,7 @@ namespace NetworkGameEngine
                 } 
                 catch(Exception ex)
                 {
-                    LogError(ex.Message);
+                    LogError($"Fatal error in world thread: {ex}");
                 }
             }
         }
@@ -203,15 +203,16 @@ namespace NetworkGameEngine
 
         internal void Update()
         {
-            int addObjectsCount = Math.Min(200, m_addObjects.Count);
+            int addObjectsCount = Math.Min(400, m_addObjects.Count);
             for (int i = 0; i < addObjectsCount && m_addObjects.TryDequeue(out var task); i++)
             {
                 GameObject obj = task.GameObject;
-                obj.Init(m_generatorID++, m_workflows.GetWorkflowByIndex(m_addObjectThIndex).ThreadID, this);
+                Workflow workflow = m_workflows.GetWorkflowByIndex(m_addObjectThIndex);
+                obj.Init(m_generatorID++, workflow, this);
 
                 m_objects.TryAdd(obj.ID, obj);
 
-                m_workflows.GetWorkflowByIndex(m_addObjectThIndex).AddObject(obj);
+                workflow.AddObject(obj);
                 m_addObjectThIndex = (m_addObjectThIndex + 1) % m_workflows.Count;
 
                 task.GameObjectID = obj.ID;
@@ -251,7 +252,7 @@ namespace NetworkGameEngine
             foreach (var obj in m_removedObjects)
             {
                 m_objects.TryRemove(obj.ID, out _);
-                m_workflows.GetWorkflowByThreadId(obj.ThreadID).RemoveObject(obj);
+                obj.Workflow.RemoveObject(obj);
                 obj.FinalizeDestroyObject();
             }
             m_removedObjects.Clear();
@@ -259,7 +260,14 @@ namespace NetworkGameEngine
             _executuinProfiler?.StartMethodProfiling(MethodType.OneThreadService);
             foreach (var service in _updatableServices)
             {
-                service.Update();
+                try
+                {
+                    service.Update();
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Error in service {service.GetType().Name}: {ex}");
+                }
             }
             _executuinProfiler?.StopMethodProfiling(MethodType.OneThreadService);
 

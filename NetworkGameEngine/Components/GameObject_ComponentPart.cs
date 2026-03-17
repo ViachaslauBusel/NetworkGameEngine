@@ -41,13 +41,13 @@ namespace NetworkGameEngine
             lock (m_incomingComponents)
             {
                 m_incomingComponents.Enqueue(component);
-                m_objectCallRegistry?.Register(this, MethodType.PrepareComponent);
+                m_workflow?.CallRegistry.Register(this, MethodType.PrepareComponent);
             }
         }
 
         public T GetComponent<T>() where T : class
         {
-            Debug.Assert(ThreadID == Thread.CurrentThread.ManagedThreadId,
+            Debug.Assert(m_workflow.ThreadID == Thread.CurrentThread.ManagedThreadId,
                    "Was called by a thread that does not own this data");
 
             if (m_components.TryGetValue(typeof(T), out Component component))
@@ -66,7 +66,7 @@ namespace NetworkGameEngine
 
         internal List<T> GetComponents<T>() where T : class
         {
-            Debug.Assert(ThreadID == Thread.CurrentThread.ManagedThreadId,
+            Debug.Assert(m_workflow.ThreadID == Thread.CurrentThread.ManagedThreadId,
                                   "Was called by a thread that does not own this data");
 
             List<T> components = new List<T>();
@@ -86,7 +86,7 @@ namespace NetworkGameEngine
             m_outgoingComponents.Add(typeof(T));
             lock (m_outgoingComponents)
             {
-                m_objectCallRegistry?.Register(this, MethodType.OnDestroyComponent);
+                m_workflow?.CallRegistry.Register(this, MethodType.OnDestroyComponent);
             }
         }
 
@@ -95,14 +95,14 @@ namespace NetworkGameEngine
             m_outgoingComponents.Add(component.GetType());
             lock (m_outgoingComponents)
             {
-                m_objectCallRegistry?.Register(this, MethodType.OnDestroyComponent);
+                m_workflow?.CallRegistry.Register(this, MethodType.OnDestroyComponent);
             }
         }
 
         internal void RegisterCallMethodsForComponent(Component component, MethodType methodType)
         {
             m_componentsCallRegistry.Register(component, methodType);
-            m_objectCallRegistry.Register(this, methodType);
+            m_workflow?.CallRegistry.Register(this, methodType);
         }
 
         internal void PrepareIncomingComponents()
@@ -118,26 +118,19 @@ namespace NetworkGameEngine
                 newComponent.InternalInit(this);
                 m_components.Add(componentType, newComponent);
                 m_componentsCallRegistry.Register(newComponent, MethodType.InitComponent);
-            }
-
-            //Register command listener
-            var componentsToInit = m_componentsCallRegistry.GetTargetsFor(MethodType.InitComponent);
-            var span = CollectionsMarshal.AsSpan(componentsToInit);
-            for (int i = 0; i < span.Length; i++)
-            {
-                var c = span[i];
-                RegisterCommandListenersForComponent(c);
-                InjectDependenciesIntoObject(c);
+                //Register command listener
+                RegisterCommandListenersForComponent(newComponent);
+                InjectDependenciesIntoObject(newComponent);
             }
 
             lock (m_incomingComponents)
             {
                 if (m_incomingComponents.Count == 0)
                 {
-                    m_objectCallRegistry.Unregister(this, MethodType.PrepareComponent);
+                    m_workflow.CallRegistry.Unregister(this, MethodType.PrepareComponent);
                 }
             }
-            m_objectCallRegistry.Register(this, MethodType.InitComponent);
+            m_workflow.CallRegistry.Register(this, MethodType.InitComponent);
         }
 
 
@@ -151,11 +144,11 @@ namespace NetworkGameEngine
                 InitComponentSafe(c);
                 if (IsActive && c.Enabled)
                 {
-                    m_objectCallRegistry.Register(this, MethodType.OnEnableComponent);
+                    m_workflow.CallRegistry.Register(this, MethodType.OnEnableComponent);
                 }
             }
             m_componentsCallRegistry.Clear(MethodType.InitComponent);
-            m_objectCallRegistry.Unregister(this, MethodType.InitComponent);
+            m_workflow.CallRegistry.Unregister(this, MethodType.InitComponent);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -205,7 +198,7 @@ namespace NetworkGameEngine
                 }
             }
             //m_methodComponents.Clear(MethodType.OnEnableComponent);
-            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.OnEnableComponent);
+            m_workflow.CallRegistry.Unregister(this, MethodType.OnEnableComponent);
         }
 
         /// <summary>
@@ -224,7 +217,7 @@ namespace NetworkGameEngine
                 c.SetStarted();
             }
             m_componentsCallRegistry.Clear(MethodType.StartComponent);
-            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.StartComponent);
+            m_workflow.CallRegistry.Unregister(this, MethodType.StartComponent);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -250,7 +243,7 @@ namespace NetworkGameEngine
             {
                 var component = span[i];
 
-                if (!component.Enabled)
+                if (!component.Enabled || !component.IsStarted)
                     continue;
 
                 //sw.Restart();
@@ -284,7 +277,7 @@ namespace NetworkGameEngine
             {
                 var component = span[i];
 
-                if (!component.Enabled) continue;
+                if (!component.Enabled || !component.IsStarted) continue;
 
                 LateUpdateComponentSafe(component);
             }
@@ -326,7 +319,7 @@ namespace NetworkGameEngine
                     m_componentsCallRegistry.Unregister(component, MethodType.UpdateComponent);
                     if (m_componentsCallRegistry.GetTargetsFor(MethodType.UpdateComponent).Count == 0)
                     {
-                        m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.UpdateComponent);
+                        m_workflow.CallRegistry.Unregister(this, MethodType.UpdateComponent);
                     }
                 }
                 if (component.HasLateUpdateOverride)
@@ -334,12 +327,12 @@ namespace NetworkGameEngine
                     m_componentsCallRegistry.Unregister(component, MethodType.LateUpdateComponent);
                     if (m_componentsCallRegistry.GetTargetsFor(MethodType.LateUpdateComponent).Count == 0)
                     {
-                        m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.LateUpdateComponent);
+                        m_workflow.CallRegistry.Unregister(this, MethodType.LateUpdateComponent);
                     }
                 }
             }
             //m_methodComponents.Clear(MethodType.OnDisableComponent);
-            m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.OnDisableComponent);
+            m_workflow.CallRegistry.Unregister(this, MethodType.OnDisableComponent);
         }
 
         internal void CallOnDestroyComponents()
@@ -408,7 +401,7 @@ namespace NetworkGameEngine
                     m_componentsCallRegistry.Unregister(component, MethodType.UpdateComponent);
                     if (m_componentsCallRegistry.GetTargetsFor(MethodType.UpdateComponent).Count() == 0)
                     {
-                        m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.UpdateComponent);
+                        m_workflow.CallRegistry.Unregister(this, MethodType.UpdateComponent);
                     }
                 }
                 if (component.HasLateUpdateOverride)
@@ -416,7 +409,7 @@ namespace NetworkGameEngine
                     m_componentsCallRegistry.Unregister(component, MethodType.LateUpdateComponent);
                     if (m_componentsCallRegistry.GetTargetsFor(MethodType.LateUpdateComponent).Count() == 0)
                     {
-                        m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.LateUpdateComponent);
+                        m_workflow.CallRegistry.Unregister(this, MethodType.LateUpdateComponent);
                     }
                 }
             }
@@ -426,7 +419,7 @@ namespace NetworkGameEngine
             {
                 if (m_outgoingComponents.Count == 0)
                 {
-                    m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Unregister(this, MethodType.OnDestroyComponent);
+                    m_workflow.CallRegistry.Unregister(this, MethodType.OnDestroyComponent);
                 }
             }
         }

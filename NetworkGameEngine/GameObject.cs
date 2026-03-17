@@ -5,17 +5,17 @@ namespace NetworkGameEngine
     public sealed partial class GameObject
     {
         private string m_name;
-        private int m_threadID = 0;
         private bool m_isDestroyed = false;
         private bool m_isActive = false;
         private World m_world;
-        private GameObjectCallRegistry m_objectCallRegistry;
+        private Workflow m_workflow;
 
         public string Name => m_name;
         public uint ID { get; private set; }
-        public int ThreadID => m_threadID;
+        //public int ThreadID => m_workflow.ThreadID;
         public bool IsDestroyed => m_isDestroyed;
         public World World => m_world;
+        internal Workflow Workflow => m_workflow;
         public bool IsActive => m_isActive;
 
         public GameObject(string name)
@@ -37,27 +37,26 @@ namespace NetworkGameEngine
             m_isActive = value;
             if (m_isActive)
             {
-                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnEnableComponent);
+                m_workflow.CallRegistry.Register(this, MethodType.OnEnableComponent);
             }
             else
             {
-                m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDisableComponent);
+                m_workflow.CallRegistry.Register(this, MethodType.OnDisableComponent);
             }
         }
 
         public bool IsCurrentThreadOwner()
         {
-            return m_threadID == Thread.CurrentThread.ManagedThreadId && this == m_world.Workflows.GetCurrentWorkflow().CurrentGameObject;
+            return m_workflow.ThreadID == Thread.CurrentThread.ManagedThreadId && this == m_workflow.CurrentGameObject;
         }
 
         public void InjectDependenciesIntoObject(Object component) => m_world.InjectDependenciesIntoObject(component);
 
-        internal void Init(uint objectID, int threadID, World world)
+        internal void Init(uint objectID, Workflow workflow, World world)
         {
             ID = objectID;
-            m_threadID = threadID;
             m_world = world;
-            m_objectCallRegistry = m_world.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry;
+            m_workflow = workflow;
             m_isActive = true;
         }
 
@@ -67,7 +66,7 @@ namespace NetworkGameEngine
             {
                 m_outgoingComponents.Add(comp.GetType());
             }
-            m_world?.Workflows.GetWorkflowByThreadId(ThreadID).CallRegistry.Register(this, MethodType.OnDestroyComponent);
+            m_workflow?.CallRegistry.Register(this, MethodType.OnDestroyComponent);
         }
 
         public void Destroy()

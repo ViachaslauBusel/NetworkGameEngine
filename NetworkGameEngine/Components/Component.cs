@@ -43,13 +43,11 @@ namespace NetworkGameEngine
                 m_enabled = value;
                 if (m_enabled)
                 {
-                    m_gameObject.World.Workflows.GetWorkflowByThreadId(m_gameObject.ThreadID)
-                        .CallRegistry.Register(m_gameObject, MethodType.OnEnableComponent);
+                    m_gameObject.Workflow.CallRegistry.Register(m_gameObject, MethodType.OnEnableComponent);
                 }
                 else
                 {
-                    m_gameObject.World.Workflows.GetWorkflowByThreadId(m_gameObject.ThreadID)
-                        .CallRegistry.Register(m_gameObject, MethodType.OnDisableComponent);
+                    m_gameObject.Workflow.CallRegistry.Register(m_gameObject, MethodType.OnDisableComponent);
                 }
             }
         }
@@ -126,14 +124,14 @@ namespace NetworkGameEngine
 
         public void DestroyComponent<T>() where T : Component
         {
-            Debug.Assert(m_gameObject.ThreadID == Thread.CurrentThread.ManagedThreadId,
+            Debug.Assert(m_gameObject.Workflow.ThreadID == Thread.CurrentThread.ManagedThreadId,
                                                              "Was called by a thread that does not own this data");
             m_gameObject.DestroyComponent<T>();
         }
 
         public void DestroyComponent(Component component)
         {
-            Debug.Assert(m_gameObject.ThreadID == Thread.CurrentThread.ManagedThreadId,
+            Debug.Assert(m_gameObject.Workflow.ThreadID == Thread.CurrentThread.ManagedThreadId,
                                                              "Was called by a thread that does not own this data");
             m_gameObject.DestroyComponent(component);
         }
