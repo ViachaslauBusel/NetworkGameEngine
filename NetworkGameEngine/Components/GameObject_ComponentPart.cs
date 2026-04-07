@@ -109,6 +109,11 @@ namespace NetworkGameEngine
         {
             while (m_incomingComponents.TryDequeue(out Component newComponent))
             {
+                if (IsDestroyed)
+                {
+                    newComponent.InternalSetError();
+                    continue;
+                }
                 Type componentType = newComponent.GetType();
                 if (m_components.ContainsKey(componentType))
                 {

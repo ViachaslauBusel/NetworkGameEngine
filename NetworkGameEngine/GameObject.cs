@@ -60,7 +60,7 @@ namespace NetworkGameEngine
             m_isActive = true;
         }
 
-        internal void ScheduleDestroyComponent()
+        internal void ScheduleDestroyComponents()
         {
             foreach (var comp in m_components.Values)
             {

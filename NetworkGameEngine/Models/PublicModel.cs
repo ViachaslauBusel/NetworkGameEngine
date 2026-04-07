@@ -56,6 +56,7 @@ namespace NetworkGameEngine
 
             try
             {
+                _syncData._gameObject = GameObject;
                 _syncData.OnBeforeDataSync(this);
             }
             catch (Exception ex)

@@ -44,5 +44,16 @@
 
             return new DatabaseRequest<TResult>(serverAddress, _funcName, _args);
         }
+
+        // For DB functions returning void
+        public DatabaseRequest<object> BuildRequest()
+        {
+            string serverAddress = _provider.GetConfig(_database, _serverIndex)?.ServerAddress;
+
+            ArgumentException.ThrowIfNullOrWhiteSpace(_funcName);
+            ArgumentException.ThrowIfNullOrWhiteSpace(serverAddress);
+
+            return new DatabaseRequest<object>(serverAddress, _funcName, _args);
+        }
     }
 }

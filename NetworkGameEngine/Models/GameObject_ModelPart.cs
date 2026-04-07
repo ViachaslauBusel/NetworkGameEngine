@@ -291,5 +291,17 @@ namespace NetworkGameEngine
             m_dataToUpdate.Enqueue(data);
             m_workflow.CallRegistry.Register(this, MethodType.UpdateModels);
         }
+
+        internal void ScheduleDestroyModels()
+        {
+            lock (m_outgoingRemovals)
+            {
+                foreach (var type in m_dataStore.Keys)
+                {
+                    m_outgoingRemovals.Enqueue(new DataRemoveRequest(type, key: null, allOfType: true));
+                }
+                m_workflow?.CallRegistry.Register(this, MethodType.OnDetachModel);
+            }
+        }
     }
 }

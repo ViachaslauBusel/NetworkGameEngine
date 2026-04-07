@@ -55,7 +55,7 @@ namespace NetworkGameEngine.Database
             {
                 try
                 {
-                    return ExecuteRequest();
+                    return Execute();
                 }
                 catch (Exception ex) when (!throwException)
                 {
@@ -82,7 +82,7 @@ namespace NetworkGameEngine.Database
             {
                 try
                 {
-                    return ExecuteRequest();
+                    return Execute();
                 }
                 catch (Exception ex) when (!throwException)
                 {
@@ -94,7 +94,7 @@ namespace NetworkGameEngine.Database
             return _executionTask;
         }
 
-        private TResult ExecuteRequest()
+        public TResult Execute()
         {
             using var connection = new NpgsqlConnection(_connectionString);
             connection.Open();

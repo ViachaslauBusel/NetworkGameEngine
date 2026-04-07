@@ -4,7 +4,7 @@ namespace NetworkGameEngine
 {
     public abstract class LocalModel : SyncMarkers
     {
-        private GameObject _gameObject;
+        protected GameObject _gameObject;
         protected internal bool _isDuplicate = false;
 
         public GameObject GameObject => _gameObject;

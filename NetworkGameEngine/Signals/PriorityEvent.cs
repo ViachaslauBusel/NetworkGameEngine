@@ -99,10 +99,17 @@ namespace NetworkGameEngine
         {
             GameObject ownerGameObject = GlobalWorkflowRegistry.GetCurrentWorkflow()?.CurrentGameObject;
 
-            if (entry.Owner != null && entry.Owner != ownerGameObject)
+            //Если регистрация была не связана с GameObject, то вызываем в новом потоке
+            if (entry.Owner == null)
+            {
+                Task.Run(() => call?.Invoke());
+            }
+            //Если регистрация была связана с GameObject, отличным от текущего, то отправляем команду на выполнение в этом GameObject
+            else if (entry.Owner != null && entry.Owner != ownerGameObject)
             {
                 entry.Owner.SendCommand(new ExecuteActionCommand(call));
             }
+            //Если регистрация была связана с текущим GameObject, то вызываем напрямую
             else
             {
                 call?.Invoke();
