@@ -46,6 +46,15 @@
             _onDirty.Invoke();
         }
 
+        public virtual void MarkAsDirty(SyncMarkerType local)
+        {
+            if (_markers.ContainsKey(local))
+            {
+                _markers[local] = true;
+                _onDirty.Invoke();
+            }
+        }
+
         public virtual void MarkAsClean(SyncMarkerType local)
         {
             if (_markers.ContainsKey(local))

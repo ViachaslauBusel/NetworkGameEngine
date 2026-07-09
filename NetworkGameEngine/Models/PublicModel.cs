@@ -12,9 +12,8 @@ namespace NetworkGameEngine
     {
         private PublicModel _syncData;
 
-        internal override void Initialize(GameObject gameObject)
+        internal void InitializeDuplicate()
         {
-           base.Initialize(gameObject);
             _syncData = CreateData();
             SyncData();
         }

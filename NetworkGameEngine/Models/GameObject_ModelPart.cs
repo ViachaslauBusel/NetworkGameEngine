@@ -1,5 +1,4 @@
-﻿using NetworkGameEngine.Workflows;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 
 namespace NetworkGameEngine
 {
@@ -81,6 +80,10 @@ namespace NetworkGameEngine
                 foreach (var data in m_newDataBlocks)
                 {
                     data.OnAttached();
+                    if (data is PublicModel publicModel)
+                    {
+                        publicModel.InitializeDuplicate();
+                    }
                 }
                 m_newDataBlocks.Clear();
                 m_workflow.CallRegistry.Unregister(this, MethodType.OnAttachModel);
